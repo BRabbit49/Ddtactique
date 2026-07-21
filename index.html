@@ -361,12 +361,27 @@ const SCENARIOS = {
    Ces données NE sont plus embarquées dans ce fichier : elles sont chargées
    depuis la table Grist "ScenarioMJData", protégée par des Access Rules pour
    n'être lisible que par les comptes Grist désignés comme Maîtres du Jeu.
-   MJ_DATA[scenarioId][eventNum] = {correctionType, correction, thresholdScale, gmNote, documents}
-   Reste `null` si l'utilisateur courant n'a pas les droits de lecture sur cette table. */
+   MJ_DATA[scenarioId][eventNum] = {correctionType, correction, thresholdScale, gmNote, documents, attachmentIds}
+   Reste `null` si l'utilisateur courant n'a pas les droits de lecture sur cette table.
+
+   Colonne optionnelle "Fichier" (type Attachments) sur ScenarioMJData : les
+   fichiers réels (bulletins Vigicrues, etc.) déposés dans cette cellule sont
+   associés aux entrées du champ Documents dans l'ordre (1er fichier = 1er
+   document listé, etc.). */
 let MJ_DATA = null;
 function getEventMJData(scenarioId, num){
   return (MJ_DATA && MJ_DATA[scenarioId] && MJ_DATA[scenarioId][num]) || null;
 }
+
+// Les cellules de type Attachments peuvent être renvoyées encodées par
+// fetchTable (ex. ['L', id1, id2, ...]) ou déjà sous forme de simple liste
+// d'identifiants selon le contexte — on gère les deux cas défensivement.
+function decodeAttachmentIds(raw){
+  if(!raw || !Array.isArray(raw)) return [];
+  if(raw[0] === 'L') return raw.slice(1);
+  return raw.filter(v => typeof v === 'number');
+}
+
 async function loadMJData(){
   try{
     const rr = await grist.docApi.fetchTable('ScenarioMJData');
@@ -380,7 +395,8 @@ async function loadMJData(){
         correction: JSON.parse(r.Correction || '[]'),
         thresholdScale: r.ThresholdScale ? JSON.parse(r.ThresholdScale) : null,
         gmNote: r.GmNote || '',
-        documents: r.Documents ? JSON.parse(r.Documents) : []
+        documents: r.Documents ? JSON.parse(r.Documents) : [],
+        attachmentIds: decodeAttachmentIds(r.Fichier)
       };
     });
     MJ_DATA = data;
@@ -445,13 +461,11 @@ function freshState(code, scenarioId){
    simplement déplacée vers une table Grist pour permettre l'auto-hébergement
    et la synchronisation entre joueurs via le document partagé). ---------------------------- */
 const GRIST_TABLE = 'Sessions';
-const GRIST_JOURNAL_TABLE = 'Journal';
 const GRIST_EVENTS_TABLE = 'Evenements';
 const GRIST_EVAL_TABLE = 'Evaluation';
 let EVAL_SYNCED_PLAYTHROUGHS = new Set(); // "code|createdAt" déjà écrits, pour ne pas dupliquer à chaque partie rejouée sous le même code
 let GRIST_READY = false;
 let GRIST_ERROR = null;
-let SYNCED_LOG_IDS = new Set(); // évite de renvoyer en double les entrées déjà écrites dans Journal
 
 function rowRecordsToArray(rr){
   if(!rr || !rr.id) return [];
@@ -539,7 +553,6 @@ async function saveState(state){
     }
   }catch(e){ console.error('Grist saveState error', e); alert("Erreur d'écriture dans Grist — vérifiez que le widget a bien l'accès complet (\"Full document access\") et que la table Sessions existe."); }
   await syncEventsToGrist(state);
-  syncLogToGrist(state); // best-effort, ne bloque jamais le jeu si la table Journal est absente
   syncEvaluationToGrist(state); // best-effort, ne bloque jamais le jeu si la table Evaluation est absente
 }
 
@@ -568,24 +581,6 @@ async function syncEvaluationToGrist(state){
     EVAL_SYNCED_PLAYTHROUGHS.add(playthroughKey);
   }catch(e){
     console.warn('Table Evaluation absente ou inaccessible — le bilan individuel n’est pas archivé (non bloquant) :', e);
-  }
-}
-
-// Écrit chaque nouvelle entrée du journal (injects, soumissions, événements
-// système) comme une ligne distincte dans la table Grist "Journal", pour
-// qu'elle soit consultable directement dans Grist (Raw Data) — et pas
-// seulement noyée dans le StateJson de la table Sessions.
-async function syncLogToGrist(state){
-  try{
-    const newEntries = state.log.filter(l => !SYNCED_LOG_IDS.has(l.id));
-    if(!newEntries.length) return;
-    const actions = newEntries.map(l => ['AddRecord', GRIST_JOURNAL_TABLE, null, {
-      Code: state.code, Ts: l.ts, Type: l.type, EventId: l.eventId || '', Text: l.text
-    }]);
-    await grist.docApi.applyUserActions(actions);
-    newEntries.forEach(l => SYNCED_LOG_IDS.add(l.id));
-  }catch(e){
-    console.warn('Table Journal absente ou inaccessible — le journal reste visible dans le jeu mais pas dans Grist (non bloquant) :', e);
   }
 }
 
@@ -654,9 +649,6 @@ async function createOrJoin(){
     }
     state = freshState(code, LOCAL.scenarioChoice);
   }
-  // Marque comme "déjà synchronisé" tout ce qui existe déjà dans le journal,
-  // pour ne pousser vers la table Journal que les nouvelles entrées à venir.
-  state.log.forEach(l=>SYNCED_LOG_IDS.add(l.id));
   if(LOCAL.role === 'joueur'){
     state.players[LOCAL.playerId] = {
       name: LOCAL.playerName, joinedAt: nowTs(), lastDrawTour: -1,
@@ -863,13 +855,28 @@ function openDocEditor(eventId, docId, defaultContent){
   render();
 }
 function cancelDocEditor(){ LOCAL.openDocEditor = null; LOCAL.docDraft=''; render(); }
-function sendDocument(eventId, docId, label){
+function sendDocument(eventId, docId, label, attachmentId){
   mutate(s=>{
-    s.log.push({id:uid(), ts:nowTs(), type:'document', eventId, text:
-      '📄 Document transmis — '+label+' : '+LOCAL.docDraft});
+    s.log.push({id:uid(), ts:nowTs(), type:'document', eventId,
+      attachmentId: attachmentId || null,
+      text: '📄 Document transmis — '+label+' : '+LOCAL.docDraft});
   });
   LOCAL.openDocEditor = null;
   LOCAL.docDraft = '';
+}
+
+// Génère un lien de téléchargement temporaire pour une pièce jointe Grist
+// et l'ouvre dans un nouvel onglet. Le jeton n'est demandé qu'au moment du
+// clic (pas au moment de l'affichage), pour rester valide.
+async function downloadAttachment(attachmentId){
+  try{
+    const tokenInfo = await grist.docApi.getAccessToken({readOnly:true});
+    const url = tokenInfo.baseUrl + '/attachments/' + attachmentId + '/download?auth=' + tokenInfo.token;
+    window.open(url, '_blank');
+  }catch(e){
+    console.error('Téléchargement de la pièce jointe impossible', e);
+    alert("Impossible de récupérer ce fichier depuis Grist. Vérifiez qu'il a bien été déposé dans la colonne « Fichier » de ScenarioMJData, dans le bon ordre.");
+  }
 }
 
 /* ----- MJ : correction / clôture d'un événement ----- */
@@ -1173,7 +1180,7 @@ function renderGame(s){
 
       <div class="panel">
         <div class="panel-head"><h2>Journal de crise</h2></div>
-        <div class="log">${[...s.log].reverse().map(l=>`<div class="log-item ${l.type}"><span class="log-time">${fmtClock(l.ts)}</span>${escapeHtml(l.text)}</div>`).join('') || '<div class="empty">Le journal est vide.</div>'}</div>
+        <div class="log">${[...s.log].reverse().map(l=>`<div class="log-item ${l.type}"><span class="log-time">${fmtClock(l.ts)}</span>${escapeHtml(l.text)}${l.attachmentId?` <button class="btn doc" style="padding:2px 8px;font-size:10.5px;" data-download-att="${l.attachmentId}">⬇ Télécharger</button>`:''}</div>`).join('') || '<div class="empty">Le journal est vide.</div>'}</div>
       </div>
     </div>
   </div>
@@ -1255,15 +1262,23 @@ function renderDocBox(e, mjData){
   return `
   <div class="doc-box">
     <b>Documents mobilisables (à transmettre sur demande des joueurs)</b>
-    ${mjData.documents.map(d=>{
+    ${mjData.documents.map((d,idx)=>{
       const key = e.id+'|'+d.id;
       const isOpen = LOCAL.openDocEditor === key;
+      const attId = (mjData.attachmentIds && mjData.attachmentIds[idx]) || null;
       return `<div>
-        <div class="doc-item"><span>${escapeHtml(d.label)}</span>${isOpen?'':`<button class="btn doc" data-doc-open="${e.id}|${d.id}|${encodeURIComponent(d.defaultContent||'')}">Rédiger et transmettre</button>`}</div>
+        <div class="doc-item">
+          <span>${escapeHtml(d.label)}</span>
+          <span style="display:flex;gap:6px;">
+            ${attId ? `<button class="btn doc" data-download-att="${attId}">⬇ Télécharger</button>` : ''}
+            ${isOpen?'':`<button class="btn doc" data-doc-open="${e.id}|${d.id}|${encodeURIComponent(d.defaultContent||'')}|${attId||''}">Rédiger et transmettre</button>`}
+          </span>
+        </div>
+        ${!attId ? `<div class="hint" style="margin:2px 0 0;">Aucun fichier déposé pour ce document — voir colonne « Fichier » de ScenarioMJData.</div>` : ''}
         ${isOpen ? `<div class="doc-edit">
           <textarea id="doc-editor-${e.id}-${d.id}">${escapeHtml(LOCAL.docDraft)}</textarea>
           <div class="btn-row">
-            <button class="btn ok" data-doc-send="${e.id}|${d.id}|${encodeURIComponent(d.label)}">Transmettre au journal</button>
+            <button class="btn ok" data-doc-send="${e.id}|${d.id}|${encodeURIComponent(d.label)}|${attId||''}">Transmettre au journal</button>
             <button class="btn" data-doc-cancel="1">Annuler</button>
           </div>
         </div>` : ''}
@@ -1514,13 +1529,16 @@ function attachCommonHandlers(s){
   document.querySelectorAll('[data-doc-cancel]').forEach(btn=>{ btn.onclick = cancelDocEditor; });
   document.querySelectorAll('[data-doc-send]').forEach(btn=>{
     btn.onclick = ()=>{
-      const [eventId, docId, encLabel] = btn.getAttribute('data-doc-send').split('|');
+      const [eventId, docId, encLabel, attId] = btn.getAttribute('data-doc-send').split('|');
       const ta = byId('doc-editor-'+eventId+'-'+docId);
       LOCAL.docDraft = ta ? ta.value : LOCAL.docDraft;
-      sendDocument(eventId, docId, decodeURIComponent(encLabel));
+      sendDocument(eventId, docId, decodeURIComponent(encLabel), attId || null);
     };
   });
   document.querySelectorAll('.doc-edit textarea').forEach(ta=>{ ta.oninput = ()=>{ LOCAL.docDraft = ta.value; }; });
+  document.querySelectorAll('[data-download-att]').forEach(btn=>{
+    btn.onclick = ()=>downloadAttachment(btn.getAttribute('data-download-att'));
+  });
 
   document.querySelectorAll('textarea.reply').forEach(ta=>{ ta.oninput = ()=>{ LOCAL.draft = ta.value; }; });
 }
