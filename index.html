@@ -677,19 +677,27 @@ async function createOrJoin(){
   render();
 }
 
+let MUTATING = false; // vrai pendant qu'un clic MJ/joueur est en train d'écrire dans Grist
+
 function startPolling(){
   if(LOCAL.pollTimer) clearInterval(LOCAL.pollTimer);
   LOCAL.pollTimer = setInterval(async ()=>{
+    if(MUTATING) return; // évite d'écraser un changement en cours d'écriture par une lecture concurrente
     const s = await loadState(LOCAL.code);
     if(s){ LOCAL.state = s; render(); }
   }, POLL_MS);
 }
 
 async function mutate(fn){
-  let s = await loadState(LOCAL.code) || LOCAL.state;
-  fn(s);
-  await saveState(s);
-  LOCAL.state = s;
+  MUTATING = true;
+  try{
+    let s = await loadState(LOCAL.code) || LOCAL.state;
+    fn(s);
+    await saveState(s);
+    LOCAL.state = s;
+  } finally {
+    MUTATING = false;
+  }
   render();
 }
 
