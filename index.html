@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDTactique</title>
+<!-- Adaptez cette URL selon votre instance Grist :
+     - grist.numerique.gouv.fr : https://grist.numerique.gouv.fr/grist-plugin-api.js
+     - instance auto-hébergée   : https://grist.votre-ddt.fr/grist-plugin-api.js -->
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#12181c;
+  --bg-panel:#1a2228;
+  --bg-panel-raised:#212b32;
+  --bg-input:#0e1418;
+  --line:#2c383f;
+  --text:#e7edf0;
+  --text-dim:#8fa3ac;
+  --text-faint:#5a6d76;
+  --vert:#2e8f5a;
+  --jaune:#e0b23c;
+  --orange:#e07a2e;
+  --rouge:#c8402e;
+  --accent:#4fb0c6;
+  --action-c:#8fb4d6;
+  --ressource-c:#d6ac6f;
+  --doc-c:#a98fd6;
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'IBM Plex Sans', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+body{min-height:100vh;background-image:
+  radial-gradient(circle at 15% 10%, rgba(79,176,198,0.05), transparent 40%),
+  radial-gradient(circle at 85% 90%, rgba(200,64,46,0.05), transparent 40%);
+}
+#app{max-width:1240px;margin:0 auto;padding:20px 20px 60px;}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 6px;}
+h1,h2,h3{font-family:var(--font-display);margin:0;}
+h1{font-size:26px;font-weight:600;letter-spacing:-.01em;}
+h2{font-size:16px;font-weight:600;}
+h3{font-size:13px;font-weight:600;}
+p{line-height:1.5;color:var(--text-dim);}
+button{font-family:var(--font-body);cursor:pointer;}
+input,select,textarea{font-family:var(--font-body);}
+a{color:var(--accent);}
+
+/* ---------- landing ---------- */
+.landing{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px 0;}
+.landing-card{width:100%;max-width:520px;background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;padding:32px;}
+.landing-card .sub{font-size:13px;color:var(--text-faint);margin-bottom:22px;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;}
+.field input, .field select{width:100%;padding:11px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-input);color:var(--text);font-size:15px;}
+.field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
+.role-toggle{display:flex;gap:8px;margin-bottom:16px;}
+.role-toggle button{flex:1;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-input);color:var(--text-dim);font-size:14px;font-weight:600;transition:.15s;}
+.role-toggle button.active{border-color:var(--accent);color:var(--text);background:rgba(79,176,198,0.12);}
+.btn-primary{width:100%;padding:13px;border-radius:8px;border:none;background:var(--accent);color:#0a1418;font-weight:600;font-size:15px;}
+.btn-primary:hover{filter:brightness(1.08);}
+.hint{font-size:12px;color:var(--text-faint);margin-top:10px;line-height:1.5;}
+
+.scenario-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.scenario-opt{border:1px solid var(--line);border-radius:9px;padding:11px 13px;cursor:pointer;background:var(--bg-input);transition:.12s;}
+.scenario-opt:hover{border-color:var(--accent);}
+.scenario-opt.active{border-color:var(--accent);background:rgba(79,176,198,.1);}
+.scenario-opt.disabled{opacity:.45;cursor:not-allowed;}
+.scenario-opt .so-title{font-family:var(--font-display);font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+.scenario-opt .so-desc{font-size:12px;color:var(--text-faint);margin-top:3px;}
+.tag-soon{font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;background:rgba(224,178,60,.15);color:var(--jaune);padding:2px 7px;border-radius:20px;}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.topbar-left{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.badge{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);color:var(--text-dim);}
+.badge.mj{border-color:var(--accent);color:var(--accent);}
+.badge.scenario{border-color:var(--ressource-c);color:var(--ressource-c);}
+.timer{font-family:var(--font-mono);font-size:26px;font-weight:600;letter-spacing:.02em;}
+.timer.warn{color:var(--jaune);}
+.timer.crit{color:var(--rouge);}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.iconbtn{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-dim);padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--font-mono);}
+.iconbtn:hover{color:var(--text);border-color:var(--accent);}
+
+/* ---------- gauge ---------- */
+.gauge-wrap{display:flex;align-items:center;gap:10px;}
+.gauge-track{display:flex;gap:3px;}
+.gauge-seg{width:20px;height:12px;border-radius:3px;background:var(--line);}
+.gauge-seg.on-vert{background:var(--vert);}
+.gauge-seg.on-jaune{background:var(--jaune);}
+.gauge-seg.on-orange{background:var(--orange);}
+.gauge-seg.on-rouge{background:var(--rouge);}
+.gauge-label{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:1fr;gap:16px;}
+@media(min-width:960px){ .grid.two-col{grid-template-columns:1.35fr 1fr;} }
+.panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:18px;}
+.panel + .panel{margin-top:16px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap;}
+
+/* ---------- event card ---------- */
+.event-card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--bg-panel-raised);position:relative;overflow:hidden;}
+.event-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.event-card.lvl-0::before{background:var(--vert);}
+.event-card.lvl-1::before{background:var(--jaune);}
+.event-card.lvl-2::before{background:var(--orange);}
+.event-card.lvl-3::before,.event-card.lvl-4::before{background:var(--rouge);}
+.event-card.resolved{opacity:.6;}
+.event-card.resolved::before{background:var(--text-faint);}
+.event-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px;}
+.event-num{font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.05em;}
+.event-title{font-family:var(--font-display);font-weight:600;font-size:15px;margin:2px 0 6px;}
+.event-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;}
+.event-body{font-size:13.5px;color:var(--text-dim);white-space:pre-wrap;margin:8px 0;}
+.event-defi{font-size:13.5px;color:var(--text);background:rgba(79,176,198,0.08);border:1px solid rgba(79,176,198,0.25);border-radius:7px;padding:10px 12px;margin-top:8px;}
+.event-defi b{color:var(--accent);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;}
+.pill.ok{background:rgba(46,143,90,.18);color:var(--vert);}
+.pill.ko{background:rgba(200,64,46,.18);color:var(--rouge);}
+.pill.wait{background:rgba(224,178,60,.18);color:var(--jaune);}
+.pill.pending{background:rgba(255,255,255,.06);color:var(--text-dim);}
+
+.gm-note{margin-top:10px;font-size:12.5px;background:rgba(224,178,60,.08);border:1px dashed var(--jaune);border-radius:7px;padding:9px 11px;color:#d9c07a;}
+.gm-note b{color:var(--jaune);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+.correction-box{margin-top:10px;background:rgba(200,64,46,.06);border:1px solid rgba(200,64,46,.28);border-radius:7px;padding:10px 12px;}
+.correction-box b{color:var(--rouge);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px;}
+.correction-item{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;padding:4px 0;color:var(--text);}
+.correction-item input{margin-top:3px;flex:none;}
+.correction-item .malus-tag{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-left:auto;flex:none;white-space:nowrap;}
+.threshold-note{font-size:11.5px;color:var(--text-faint);font-family:var(--font-mono);margin-top:6px;}
+.no-grille{font-size:12.5px;color:var(--text-faint);font-style:italic;margin-bottom:8px;}
+
+.doc-box{margin-top:10px;background:rgba(169,143,214,.07);border:1px solid rgba(169,143,214,.3);border-radius:7px;padding:10px 12px;}
+.doc-box b{color:var(--doc-c);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px;}
+.doc-item{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;}
+.doc-edit textarea{width:100%;min-height:60px;background:var(--bg-input);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:8px;font-size:12.5px;margin-top:6px;}
+
+/* ---------- controls ---------- */
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.btn{padding:8px 13px;border-radius:7px;border:1px solid var(--line);background:var(--bg-input);color:var(--text);font-size:12.5px;font-weight:600;}
+.btn:hover{border-color:var(--accent);}
+.btn.ok{border-color:var(--vert);color:var(--vert);}
+.btn.ok:hover{background:rgba(46,143,90,.12);}
+.btn.ko{border-color:var(--rouge);color:var(--rouge);}
+.btn.ko:hover{background:rgba(200,64,46,.12);}
+.btn.wait{border-color:var(--jaune);color:var(--jaune);}
+.btn.wait:hover{background:rgba(224,178,60,.12);}
+.btn.accent{border-color:var(--accent);color:var(--accent);}
+.btn.accent:hover{background:rgba(79,176,198,.12);}
+.btn.doc{border-color:var(--doc-c);color:var(--doc-c);}
+.btn.doc:hover{background:rgba(169,143,214,.12);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn.big{padding:12px 20px;font-size:14px;}
+
+/* ---------- submissions / log ---------- */
+.sub-item{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg-input);}
+.sub-head{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-bottom:5px;flex-wrap:wrap;gap:6px;}
+.sub-text{font-size:13.5px;color:var(--text);white-space:pre-wrap;}
+.sub-cards{margin-top:6px;}
+.log{max-height:320px;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:8px;padding-right:4px;}
+.log-item{font-size:12.5px;border-left:2px solid var(--line);padding:4px 0 4px 10px;}
+.log-item.inject{border-color:var(--accent);}
+.log-item.document{border-color:var(--doc-c);}
+.log-item.validation-ok{border-color:var(--vert);}
+.log-item.validation-ko{border-color:var(--rouge);}
+.log-item.validation-wait{border-color:var(--jaune);}
+.log-item.system{border-color:var(--text-faint);color:var(--text-faint);font-style:italic;}
+.log-time{font-family:var(--font-mono);color:var(--text-faint);margin-right:6px;}
+
+textarea.reply{width:100%;min-height:64px;background:var(--bg-input);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px 12px;font-size:13.5px;resize:vertical;}
+textarea.reply:focus{outline:none;border-color:var(--accent);}
+input.precision{width:100%;background:var(--bg-input);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 9px;font-size:12.5px;margin-top:4px;}
+input.malus-manual{width:70px;background:var(--bg-input);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:6px 8px;font-size:13px;}
+
+.empty{color:var(--text-faint);font-size:13px;padding:18px 10px;text-align:center;border:1px dashed var(--line);border-radius:8px;}
+
+/* ---------- cards / hand ---------- */
+.hand-zone{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+.card{border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--font-mono);width:100%;display:flex;align-items:flex-start;gap:8px;background:var(--bg-input);border:1px solid var(--line);}
+.card.action{border-left:3px solid var(--action-c);}
+.card.ressource{border-left:3px solid var(--ressource-c);}
+.card input[type=checkbox]{margin-top:2px;flex:none;}
+.card .card-type{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:2px;}
+.card.action .card-type{color:var(--action-c);}
+.card.ressource .card-type{color:var(--ressource-c);}
+.deck-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+
+.players-list{display:flex;flex-wrap:wrap;gap:6px;}
+.player-chip{font-family:var(--font-mono);font-size:11px;background:var(--bg-input);border:1px solid var(--line);border-radius:20px;padding:4px 10px;color:var(--text-dim);}
+
+/* ---------- contact sheet ---------- */
+.contact-sheet{margin-top:10px;background:rgba(79,176,198,.06);border:1px solid rgba(79,176,198,.3);border-radius:8px;padding:12px;}
+.contact-sheet h4{margin:0 0 8px;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);}
+.contact-table{width:100%;border-collapse:collapse;font-size:12px;}
+.contact-table th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--text-faint);padding:4px 6px;border-bottom:1px solid var(--line);}
+.contact-table td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+.contact-table td.actor-name{white-space:nowrap;}
+.contact-table input[type=checkbox]{transform:scale(1.05);}
+.contact-table input[type=text]{width:100%;background:var(--bg-input);border:1px solid var(--line);border-radius:5px;color:var(--text);padding:4px 6px;font-size:11.5px;}
+
+/* ---------- grille de points ---------- */
+.points-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.points-table th{text-align:left;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;color:var(--text-faint);padding:6px;border-bottom:1px solid var(--line);}
+.points-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,.04);}
+.points-table tr:last-child td{font-weight:600;border-top:1px solid var(--line);}
+
+.endscreen{text-align:center;padding:60px 20px;}
+.endscreen .big-result{font-family:var(--font-display);font-size:32px;font-weight:600;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================================
+   DDTactique — prototype de serious game réseau (MJ + joueurs), multi-scénarios
+   VERSION GRIST : ce fichier est destiné à être ajouté comme Custom Widget
+   dans un document Grist (voir table "Sessions" requise plus bas). Le stockage
+   partagé passe par les tables Grist au lieu de window.storage ; la synchro
+   entre joueurs se fait par sondage (poll 2,5s) de la table Sessions.
+   ========================================================================= */
+
+const POLL_MS = 2500;
+const DUREE_PARTIE_SEC = 75 * 60; // 1h15 selon la règle du jeu
+const MAX_NIVEAU = 4; // 0 vert / 1 jaune / 2 orange / 3 rouge / 4 = défaite
+const NIVEAU_LABELS = ['Vert','Jaune','Orange','Rouge','DÉFAITE'];
+const TOURS_AVANT_MALUS = 3; // carte non gérée 3 tours -> +1 malus (règle du jeu)
+
+/* ---- cartes réelles fournies (communes à tous les scénarios DDTactique) ---- */
+const ACTION_CARDS = [
+  {id:'act-alerter', type:'action', label:"Alerter / informer un ou plusieurs acteurs", detail:"(à condition de remplir la feuille interlocuteur)", requiresContactSheet:true},
+  {id:'act-decision', type:'action', label:"Prendre une décision", detail:"(utilisation d'un arrêté ou prise d'un arrêté)"},
+  {id:'act-proposition', type:'action', label:"Proposer une décision", detail:"(proposition d'un arrêté)"},
+  {id:'act-remplace', type:'action', label:"Demander à être remplacé", detail:"pour cette cellule de crise, COD, conférence de presse"}
+];
+const RESSOURCE_CARDS = [
+  {id:'res-rh-hno', type:'ressource', label:"Ressource humaine hors heures ouvrées", detail:"(si elle est anticipée)"},
+  {id:'res-outils', type:'ressource', label:"Ressource outils", detail:"(préciser quel outil vous utilisez)", requiresPrecision:true, precisionLabel:"Quel outil ?"},
+  {id:'res-doc', type:'ressource', label:"Ressource documentaire", detail:"(spécifier quels documents vous utilisez)", requiresPrecision:true, precisionLabel:"Quel(s) document(s) ?"},
+  {id:'res-rh-ho', type:'ressource', label:"Ressource humaine en heures ouvrées", detail:"(spécifier quelles personnes vous sollicitez)", requiresPrecision:true, precisionLabel:"Quelle(s) personne(s) ?"}
+];
+const ALL_CARDS = [...ACTION_CARDS, ...RESSOURCE_CARDS];
+function cardDef(cardId){ return ALL_CARDS.find(c=>c.id===cardId); }
+
+/* ---- acteurs de la feuille interlocuteur (commune à tous les scénarios) ---- */
+const ACTEURS_FEUILLE = [
+  "DDT – Service ?","Direction DDT","SIDPC","Cabinet préfecture","Gendarmerie","Police nationale",
+  "DDPP","SDIS","SAMU","Cofiroute","ASF","CD 49","DREAL","ARS","OFB","Mairie (à préciser)",
+  "DIR Ouest","Astreinte RDI","Liste de diffusion","Autres"
+];
+
+const NO_GRILLE_NOTE = "Grille de correction non fournie pour ce scénario dans ce prototype — clôturez avec un malus libre en fonction de votre jugement.";
+
+/* =========================================================================
+   SCÉNARIOS
+   ========================================================================= */
+const SCENARIOS = {
+
+  circulation: {
+    label: "Circulation",
+    resume: "Carambolage sur l'A11, moutons errants, manifestation, pollution, pression médiatique.",
+    contexteT0: "Vous êtes d'astreinte depuis lundi, vous avez eu quelques appels mais aucune grosse situation. Nous sommes aujourd'hui le vendredi 4 juillet, cela fait 10 jours qu'il fait chaud (30°C en moyenne par jour).\n\nJeudi, vous avez été informé qu'une manifestation sur les restrictions d'eau aura lieu vendredi 4 juillet de 13h à 15h30. Environ 200 manifestants sont attendus sur le boulevard Foch et devant la mairie d'Angers.",
+    preludeDocument: null,
+    events: [
+      {
+        titre: "Carambolage A11 — PK 267 : organiser la déviation", heure: "15h10",
+        contexte: "Un carambolage s'est produit sur l'autoroute A11, au PK 267, sens Paris → Angers (sens 2). Un poids lourd transportant des moutons et dix véhicules légers sont impliqués. Le poids lourd s'est couché en portefeuille, bloquant totalement les deux voies du sens 2. Bilan humain : 2 morts, 8 blessés. Plusieurs moutons sont morts, blessés ou errent autour des voies. La tranchée couverte est fermée dans les deux sens. Cofiroute ne peut pas encore estimer la durée de l'incident.",
+        demandeDe: "Cofiroute",
+        defi: "Proposez une déviation adaptée au carambolage. Identifiez les axes alternatifs et informez les acteurs concernés (Cofiroute, police, préfecture).",
+        correctionType: 'each',
+        correction: [
+          {label:"Déviation sens 1 proposée (Dev13 et Dev19)", malus:2},
+          {label:"Déviation sens 2 proposée (Dev14, Dev20 ou Dev49)", malus:2},
+          {label:"Acteurs informés — tél. : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC, DDPP (animaux errants) / mail : CMVOA + liste diffusion PGT A11", malus:1}
+        ]
+      },
+      {
+        titre: "Arrêté officiel de déviation", heure: "suite",
+        contexte: "Suite au carambolage sur l'A11, la déviation doit être formalisée par un arrêté.",
+        demandeDe: "SIDPC",
+        defi: "Rédigez l'arrêté officiel concernant la déviation. Assurez-vous de la légalité et de la clarté des mesures prises.",
+        correctionType: 'each',
+        correction: [ {label:"Acteurs informés par téléphone : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC", malus:1} ]
+      },
+      {
+        titre: "Moutons errants sur la chaussée", heure: "15h25",
+        contexte: "Des moutons errent sur les voies et accotements, augmentant le risque d'accidents secondaires.",
+        demandeDe: "SIDPC / Gendarmerie",
+        defi: "Utilisez PARADES pour identifier les bétaillères disponibles. Coordonnez avec la DDPP et les éleveurs pour organiser l'évacuation des moutons.",
+        correctionType: 'each',
+        correction: [
+          {label:"Entreprises de bétaillères identifiées via PARADES (Guérineau Négoce Bétail, SARL Blin, SARL Jamin Stéphane, SARL Laurendeau, SA Transports Bâclé)", malus:2},
+          {label:"Directeur DDT informé de l'accident avant la fin du tour", malus:1}
+        ],
+        gmNote: "Chemin dans PARADES : Recensement / Recherches / Potentiel / Type de potentiel : Transport véhicules complémentaire / Camions bétaillères. Une fois les entreprises identifiées par les joueurs, informez-les que le SIDPC n'a finalement pas besoin d'activer la réquisition."
+      },
+      {
+        titre: "Manifestants hors itinéraire — fermeture des voies sur berges", heure: "15h50",
+        contexte: "Un groupe de manifestants ne respecte plus l'itinéraire déclaré et s'approche des voies sur berges. Signalé par la police municipale. Le SIDPC demande la fermeture immédiate des voies sur berges.",
+        demandeDe: "SIDPC",
+        defi: "Organisez la fermeture des voies sur berges. Proposez une déviation efficace. Communiquez avec les différents acteurs pour assurer la sécurité.",
+        correctionType: 'each',
+        correction: [
+          {label:"Déviation sens 1 proposée (Dev13 et Dev11)", malus:2},
+          {label:"Déviation sens 2 proposée (Dev14)", malus:2},
+          {label:"Acteurs informés — tél. : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC / mail : liste diffusion PGT A11", malus:1}
+        ]
+      },
+      {
+        titre: "Saturation du réseau secondaire & automobilistes en détresse", heure: "16h15",
+        contexte: "Les axes de déviation sont saturés, provoquant de gros embouteillages ; certains véhicules empruntent des routes non autorisées. Par ailleurs, plusieurs automobilistes quittent leurs véhicules et errent sur l'autoroute, fatigués par la chaleur et le manque d'eau. Le SDIS vous sollicite directement pour l'acheminement d'eau.",
+        demandeDe: "Cofiroute / SIDPC / SDIS",
+        defi: "Analysez la saturation du réseau secondaire et proposez une déviation complémentaire. Traitez la sollicitation du SDIS, et proposez un dispositif d'accueil pour les automobilistes bloqués (mairies, gymnases, etc.).",
+        correctionType: 'each',
+        correction: [
+          {label:"Pas de recherche/réquisition engagée suite à la demande directe du SDIS (redirigée vers le SIDPC)", malus:2},
+          {label:"Déviation complémentaire sens 1 proposée (Dev11 et Dev13)", malus:2},
+          {label:"Déviation complémentaire sens 2 proposée (Dev6 et Dev14)", malus:2}
+        ],
+        gmNote: "Le SDIS ne peut pas vous demander l'acheminement d'eau directement : il doit passer par le SIDPC. Seule la préfecture peut demander une recherche de réquisition ; le SIDPC répond aux joueurs de ne pas faire de recherches."
+      },
+      {
+        titre: "Pollution détectée", heure: "16h45",
+        contexte: "Une nappe irisée est signalée sur un ruisseau proche, probablement liée à l'accident (fuite de produits phytosanitaires).",
+        demandeDe: "DREAL",
+        defi: "Coordonnez avec la DREAL, Cofiroute et la DDPP pour évaluer la pollution détectée. Proposez des mesures de confinement et d'analyse.",
+        correctionType: 'each',
+        correction: [
+          {label:"Cours d'eau correctement identifié : Le Brionneau", malus:2},
+          {label:"Acteurs informés : OFB, ARS, SEEB, DREAL", malus:1}
+        ]
+      },
+      {
+        titre: "Note de synthèse pour le cabinet du préfet", heure: "16h55",
+        contexte: "Des élus locaux interpellent la préfecture. Une vidéo montrant les animaux morts et la situation des usagers circule sur les réseaux sociaux, provoquant un fort émoi. La gestion de la communication devient cruciale.",
+        demandeDe: "Cabinet du préfet",
+        defi: "Préparez une note synthétique pour le cabinet du préfet, incluant la situation, les enjeux et les recommandations pour la communication publique.",
+        correctionType: 'threshold',
+        correction: [
+          {label:"Carambolage majeur à 15h10 sur l'A11 (PK 267, sens Paris → Province)"},
+          {label:"1 poids lourd transportant des moutons couché en portefeuille"},
+          {label:"10 véhicules légers impliqués"},
+          {label:"Bilan provisoire (2 morts, 8 blessés) — ⚠️ ce chiffre n'est pas à fournir par la DDT"},
+          {label:"Moutons morts, blessés ou errants"},
+          {label:"Fermeture de la tranchée couverte dans les deux sens"},
+          {label:"Automobilistes quittant leurs véhicules (chaleur, manque d'eau)"},
+          {label:"Retour à la normale prévu à 19h30 selon Cofiroute"},
+          {label:"Fuite de produits phytosanitaires (fongicide) dans un cours d'eau, pollution en cours d'identification"}
+        ],
+        thresholdScale: [{max:1,malus:0},{max:2,malus:1},{max:3,malus:2},{max:Infinity,malus:3}],
+        gmNote: "Les joueurs ne doivent pas rédiger le communiqué de presse eux-mêmes, seulement fournir les informations clés (le malus se calcule sur le nombre d'éléments manquants)."
+      },
+      {
+        titre: "Sollicitation pour intervenir en conférence de presse", heure: "suite",
+        contexte: "Le cabinet du préfet / le service communication vous sollicite pour vous rendre en personne au point presse, voire pour représenter la DDT en COD.",
+        demandeDe: "Cabinet du préfet",
+        defi: "Décidez de la conduite à tenir face à cette sollicitation et justifiez votre position.",
+        correctionType: 'each',
+        correction: [ {label:"Les joueurs se rendent directement au point presse sans concertation préalable", malus:3, malusOnChecked:true} ],
+        gmNote: "Ce n'est pas dans le périmètre des missions/fonctions du cadre d'astreinte. La prise de parole publique relève du cabinet ou du service communication. Les joueurs peuvent fournir des éléments techniques, mais ne doivent pas intervenir en tant que porte-parole. Si les joueurs demandent l'avis du directeur DDT : celui-ci répond que non, ce n'est pas à eux d'y aller."
+      },
+      {
+        titre: "Retour à la normale — bilan post-incident", heure: "20h30",
+        contexte: "Après plusieurs heures de gestion de crise : les voies sur berges sont réouvertes progressivement, la tranchée couverte est réouverte après nettoyage et vérification des infrastructures, les animaux ont été évacués en sécurité, la circulation reprend progressivement sur le sens 2. Un bilan post-incident doit être réalisé.",
+        demandeDe: "Préfecture",
+        defi: "Assurez-vous que toutes les parties prenantes sont informées du retour à la normale.",
+        correctionType: 'each',
+        correction: [ {label:"Acteurs informés : CD49, Cofiroute, ASF, Ville d'Angers, OFB, SIDPC", malus:1} ]
+      }
+    ]
+  },
+
+  inondation: {
+    label: "Inondation",
+    resume: "Crues du Maine-et-Loire, barrage de Saint-Blaise fragilisé, réquisitions, verglas.",
+    contexteT0: "Nous sommes le vendredi 9 janvier à 9h30. Depuis une semaine, d'importantes pluies ont lieu, ce qui met les cours d'eau du Maine-et-Loire en tension. Le niveau des cours d'eau est élevé et les sols sont saturés. L'Oudon est en vigilance orange, les autres cours d'eau du Maine-et-Loire sont en jaune.",
+    preludeDocument: {label:"Bulletin Vigicrues du 08/01/2026 (bulletin de la veille)", defaultContent:"[Bulletin Vigicrues du 08/01/2026 — contenu à joindre par le MJ avant le premier tour]"},
+    events: [
+      {
+        titre: "Alerte pluies intenses — mobilisation à prévoir", heure: "Vendredi 9h30",
+        contexte: "La mairie de Segré a reçu ce matin une alerte « pluies très intenses » via APIC. Le SIDPC alerte sur une forte mobilisation à prévoir durant le week-end.",
+        demandeDe: "SIDPC",
+        defi: "Préparez-vous : anticipez la mobilisation du week-end.",
+        correctionType: 'each',
+        correction: [
+          {label:"Demande à la direction la mise en place de l'astreinte RDI (avec un agent TICSR et un agent PR)", malus:2},
+          {label:"Informe le SIDPC de l'organisation interne", malus:1}
+        ],
+        gmNote: "Si les joueurs ne demandent pas à mettre en place l'astreinte RDI : leur indiquer que le RSD impose la mise en place d'une astreinte RDI."
+      },
+      {
+        titre: "Vigicrues rouge sur l'Oudon", heure: "Vendredi 10h30",
+        contexte: "Un bulletin Vigicrues vient de tomber : l'Oudon est placé en vigilance rouge.",
+        demandeDe: "SIDPC",
+        defi: "Réalisez une analyse des enjeux au plus vite.",
+        correctionType: 'each',
+        correction: [
+          {label:"Demande l'analyse des enjeux à l'astreinte RDI", malus:2},
+          {label:"Fournit cette analyse au SIDPC", malus:1}
+        ],
+        gmNote: "Si les joueurs demandent l'analyse des enjeux à l'astreinte RDI : la leur donner.",
+        documents: [{id:'doc-vigicrues-09', label:"Bulletin Vigicrues du 09/01/2026", defaultContent:"[Bulletin Vigicrues du 09/01/2026 — contenu à compléter par le MJ]"}]
+      },
+      {
+        titre: "Cellule de crise à distance — barrage fragilisé", heure: "Samedi 8h00",
+        contexte: "La nuit a été très pluvieuse, les niveaux d'eau ont augmenté. Une cellule de crise à distance est activée. Le barrage de Saint-Blaise (commune de Noyant-la-Gravoyère) montre les premiers signes de faiblesse.",
+        demandeDe: "SIDPC",
+        defi: "Réalisez une analyse des enjeux en cas de rupture du barrage. À partir de cet événement, un point d'actualité devra être réalisé à chaque tour de jeu.",
+        correctionType: 'each',
+        correction: [
+          {label:"Informe la direction de la DDT de la situation et de la mise en place d'une cellule de crise à distance", malus:1},
+          {label:"Demande l'analyse des enjeux à l'astreinte RDI", malus:2},
+          {label:"Fournit cette analyse au SIDPC", malus:1}
+        ],
+        gmNote: "Si les joueurs demandent l'analyse des enjeux à l'astreinte RDI : la leur donner.",
+        startsRecurringReminder: "Point d'actualité à réaliser ce tour (cellule de crise à distance activée)."
+      },
+      {
+        titre: "Construction d'un ouvrage de protection provisoire", heure: "Samedi 11h00",
+        contexte: "Suite à votre analyse des enjeux, la mairie de Segré a décidé de construire un ouvrage de protection provisoire.",
+        demandeDe: "SIDPC",
+        defi: "Identifiez des entreprises disposant de sable pour la construction de l'ouvrage (via PARADES).",
+        correctionType: 'each',
+        correction: [
+          {label:"Entreprises identifiées (Constructions du Haut Anjou, Justeau Frères, SOC Terrassements Justeau)", malus:2},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "Chemin dans PARADES : Recensement / Recherches / Potentiel / Type de potentiel : Divers / Matériaux : sable.",
+        documents: [{id:'doc-vigicrues-10', label:"Bulletin Vigicrues du 10/01/2026", defaultContent:"[Bulletin Vigicrues du 10/01/2026 — contenu à compléter par le MJ]"}]
+      },
+      {
+        titre: "Réquisition d'entreprises — dérogation transport", heure: "Samedi 12h00",
+        contexte: "Le SIDPC active la réquisition d'entreprises pour la construction de l'ouvrage.",
+        demandeDe: "SIDPC",
+        defi: "Trouvez la dérogation pour les poids lourds en circulation le dimanche pour l'entreprise Constructions du Haut Anjou.",
+        correctionType: 'each',
+        correction: [
+          {label:"Trouve le bon arrêté de dérogation de circulation PL le dimanche", malus:1},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "Donner aux joueurs les informations sur l'entreprise de BTP qui circulera le dimanche.",
+        documents: [{id:'doc-entreprise-bth', label:"Informations entreprise Constructions du Haut Anjou (circulation dominicale)", defaultContent:"[Informations à transmettre — à compléter par le MJ]"}]
+      },
+      {
+        titre: "Barrage partiellement cédé — sollicitation pour évaluer les réparations", heure: "Dimanche 10h00",
+        contexte: "Le barrage de Saint-Blaise a partiellement cédé. L'ouvrage de protection provisoire a permis de réduire l'impact de la crue à Segré. Le gestionnaire de l'ouvrage vous sollicite pour évaluer les réparations d'urgence projetées.",
+        demandeDe: "Gestionnaire de l'ouvrage",
+        defi: "Décidez de la conduite à tenir face à cette sollicitation : est-ce du ressort de la DDT ?",
+        correctionType: 'each',
+        correction: [
+          {label:"Les joueurs acceptent d'évaluer les réparations (ce n'est pas leur domaine d'expertise)", malus:2, malusOnChecked:true},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "Les joueurs doivent refuser : ce n'est pas dans leur domaine d'expertise. Donner aux joueurs le bulletin Vigicrues du 10/01/2026 et, s'ils le demandent, les informations sur les réparations envisagées par le gestionnaire.",
+        documents: [{id:'doc-vigicrues-10b', label:"Bulletin Vigicrues du 10/01/2026", defaultContent:"[Bulletin Vigicrues du 10/01/2026 — contenu à compléter par le MJ]"}, {id:'doc-reparations', label:"Informations réparations d'urgence (gestionnaire du barrage)", defaultContent:"[Informations à transmettre — à compléter par le MJ]"}]
+      },
+      {
+        titre: "Sollicitation spécifique — Le Lion-d'Angers", heure: "Dimanche 17h00",
+        contexte: "La situation se stabilise temporairement. Le maire du Lion-d'Angers vous sollicite pour une analyse des enjeux propre à une hauteur d'eau de 2,56 m.",
+        demandeDe: "Maire du Lion-d'Angers",
+        defi: "Décidez de la réponse à apporter à cette sollicitation spécifique.",
+        correctionType: 'each',
+        correction: [
+          {label:"Les joueurs acceptent la demande spécifique du maire", malus:2, malusOnChecked:true},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "Les joueurs doivent refuser de fournir une analyse des enjeux spécifique à cette hauteur d'eau et indiquer au maire du Lion-d'Angers qu'il doit se référer à l'analyse des enjeux générale : la DDT ne fait pas d'analyse spécifique pour chaque mairie."
+      },
+      {
+        titre: "Verglas à la trémie de Ramon", heure: "Dimanche 18h00",
+        contexte: "Les températures négatives combinées aux infiltrations d'eau provoquent une trop grande quantité de verglas au niveau de la trémie de Ramon à Angers. Cofiroute a neutralisé les voies à cet endroit.",
+        demandeDe: "Cofiroute",
+        defi: "Décidez de la réponse à apporter face à cette perturbation (une déviation est-elle nécessaire ?).",
+        correctionType: 'each',
+        correction: [
+          {label:"Les joueurs mettent en place une déviation", malus:1, malusOnChecked:true},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "C'est un piège : il n'y a pas de déviation à mettre en place. Les automobilistes doivent sortir à l'échangeur de Saint-Serge puis redescendre après le rond-point pour reprendre les voies sur berges."
+      },
+      {
+        titre: "Décrue — retour à la normale", heure: "Lundi 8h00",
+        contexte: "Durant la nuit, les niveaux d'eau ont baissé. Le pic semble passé.",
+        demandeDe: "SIDPC",
+        defi: "Informez l'ensemble des acteurs concernés du retour à la normale.",
+        correctionType: 'each',
+        correction: [
+          {label:"Informe l'ensemble des acteurs concernés que le pic de crue est passé", malus:1},
+          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
+        ],
+        gmNote: "La liste précise des acteurs à informer n'a pas été détaillée dans la fiche d'évaluation transmise — à compléter si besoin."
+      }
+    ]
+  },
+
+  canicule: {
+    label: "Canicule",
+    resume: "Scénario en cours de construction — pas encore disponible.",
+    enConstruction: true,
+    contexteT0: "",
+    preludeDocument: null,
+    events: []
+  }
+};
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function nowTs(){ return Date.now(); }
+function fmtTime(sec){
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+function fmtClock(ts){
+  const d = new Date(ts);
+  return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function niveauClass(n){ return ['vert','jaune','orange','rouge','rouge'][Math.min(n,4)]; }
+
+function freshEvents(scenarioId){
+  const scenario = SCENARIOS[scenarioId];
+  return scenario.events.map((e,i)=>({
+    id: 'evt'+(i+1),
+    num: i+1,
+    ...e,
+    documents: e.documents || [],
+    status: 'a_venir', // a_venir | active | resolved
+    niveau: 0,
+    malusEvent: 0,
+    toursSansSuite: 0
+  }));
+}
+
+function freshState(code, scenarioId){
+  return {
+    code,
+    scenarioId,
+    createdAt: nowTs(),
+    status: 'lobby', // lobby | running | paused | ended
+    runStartedAt: null,
+    elapsedBeforePause: 0,
+    tour: 0,
+    malusTotal: 0,
+    resultat: null,
+    recurringReminder: null,
+    players: {},
+    events: freshEvents(scenarioId),
+    log: [],
+    submissions: []
+  };
+}
+
+/* ---------------------------- persistance (Grist) ----------------------------
+   Le document Grist doit contenir une table nommée "Sessions" avec 3 colonnes
+   texte : Code, ScenarioId, StateJson. Chaque partie (un code) = une ligne ;
+   l'intégralité de l'état de jeu est sérialisée dans StateJson (même logique
+   que le window.storage clé/valeur utilisé dans la version artefact Claude,
+   simplement déplacée vers une table Grist pour permettre l'auto-hébergement
+   et la synchronisation entre joueurs via le document partagé). ---------------------------- */
+const GRIST_TABLE = 'Sessions';
+let GRIST_READY = false;
+let GRIST_ERROR = null;
+
+function rowRecordsToArray(rr){
+  if(!rr || !rr.id) return [];
+  const keys = Object.keys(rr).filter(k=>k!=='id');
+  return rr.id.map((id,i)=>{
+    const row = {id};
+    keys.forEach(k=>{ row[k] = rr[k][i]; });
+    return row;
+  });
+}
+
+async function loadState(code){
+  try{
+    const rr = await grist.docApi.fetchTable(GRIST_TABLE);
+    const row = rowRecordsToArray(rr).find(r=>r.Code === code);
+    return row ? JSON.parse(row.StateJson) : null;
+  }catch(e){ console.error('Grist loadState error', e); return null; }
+}
+async function saveState(state){
+  try{
+    const rr = await grist.docApi.fetchTable(GRIST_TABLE);
+    const existing = rowRecordsToArray(rr).find(r=>r.Code === state.code);
+    const payload = {Code: state.code, ScenarioId: state.scenarioId, StateJson: JSON.stringify(state)};
+    if(existing){
+      await grist.docApi.applyUserActions([['UpdateRecord', GRIST_TABLE, existing.id, payload]]);
+    } else {
+      await grist.docApi.applyUserActions([['AddRecord', GRIST_TABLE, null, payload]]);
+    }
+  }catch(e){ console.error('Grist saveState error', e); alert("Erreur d'écriture dans Grist — vérifiez que le widget a bien l'accès complet (\"Full document access\") et que la table Sessions existe."); }
+}
+
+/* ------------------------------ app state ------------------------------ */
+let LOCAL = {
+  screen: 'landing',
+  code: '',
+  role: 'joueur',
+  scenarioChoice: 'circulation',
+  playerName: '',
+  playerId: null,
+  draft: '',
+  activeEventForReply: null,
+  selectedCards: {},
+  precisions: {},
+  contactSheet: null,
+  openDocEditor: null, // eventId|docId
+  docDraft: '',
+  pollTimer: null,
+  state: null
+};
+
+async function boot(){
+  render(); // affiche l'écran "Connexion à Grist…"
+  try{
+    grist.ready({requiredAccess: 'full'});
+    // vérifie que la table Sessions existe et est accessible
+    await grist.docApi.fetchTable(GRIST_TABLE);
+    GRIST_READY = true;
+  }catch(e){
+    console.error('Grist init error', e);
+    GRIST_ERROR = "Impossible d'accéder à la table « " + GRIST_TABLE + " ». Vérifiez : (1) qu'elle existe dans ce document Grist avec les colonnes Code / ScenarioId / StateJson (toutes en type Texte), (2) que ce widget a bien reçu l'accès complet au document (\"Full document access\" demandé à l'ajout du widget).";
+  }
+  render();
+}
+
+/* ------------------------------- actions ------------------------------- */
+async function createOrJoin(){
+  const codeInput = document.getElementById('in-code');
+  const nameInput = document.getElementById('in-name');
+  let code = (codeInput.value || '').trim().toUpperCase();
+  const name = (nameInput.value || '').trim();
+  if(!code){ code = Math.random().toString(36).slice(2,6).toUpperCase(); }
+  if(LOCAL.role === 'joueur' && !name){
+    alert("Merci d'indiquer votre prénom / pseudo pour rejoindre la partie.");
+    return;
+  }
+  LOCAL.code = code;
+  LOCAL.playerName = name || 'Maître du Jeu';
+  LOCAL.playerId = uid();
+
+  let state = await loadState(code);
+  if(!state){
+    if(LOCAL.role !== 'mj'){
+      alert("Cette session n'existe pas encore. Demandez au Maître du Jeu de créer la partie avec ce code, ou laissez le champ vide pour un nouveau code (rôle Maître du Jeu).");
+      return;
+    }
+    if(SCENARIOS[LOCAL.scenarioChoice].enConstruction){
+      alert("Ce scénario est encore en construction et n'est pas jouable pour le moment.");
+      return;
+    }
+    state = freshState(code, LOCAL.scenarioChoice);
+  }
+  if(LOCAL.role === 'joueur'){
+    state.players[LOCAL.playerId] = {
+      name: LOCAL.playerName, joinedAt: nowTs(), lastDrawTour: -1,
+      hand: [
+        {instId: uid(), cardId: ACTION_CARDS[Math.floor(Math.random()*ACTION_CARDS.length)].id},
+        {instId: uid(), cardId: RESSOURCE_CARDS[Math.floor(Math.random()*RESSOURCE_CARDS.length)].id}
+      ]
+    };
+    state.log.push({id: uid(), ts: nowTs(), type:'system', text: LOCAL.playerName + ' a rejoint la cellule de crise (main initiale distribuée : 1 carte action + 1 carte ressource).'});
+  }
+  await saveState(state);
+  LOCAL.state = state;
+  LOCAL.screen = 'game';
+  startPolling();
+  render();
+}
+
+function startPolling(){
+  if(LOCAL.pollTimer) clearInterval(LOCAL.pollTimer);
+  LOCAL.pollTimer = setInterval(async ()=>{
+    const s = await loadState(LOCAL.code);
+    if(s){ LOCAL.state = s; render(); }
+  }, POLL_MS);
+}
+
+async function mutate(fn){
+  let s = await loadState(LOCAL.code) || LOCAL.state;
+  fn(s);
+  await saveState(s);
+  LOCAL.state = s;
+  render();
+}
+
+function elapsedSec(s){
+  if(s.status === 'lobby') return 0;
+  if(s.status === 'running'){ return s.elapsedBeforePause + (nowTs() - s.runStartedAt)/1000; }
+  return s.elapsedBeforePause;
+}
+function remainingSec(s){ return DUREE_PARTIE_SEC - elapsedSec(s); }
+
+function startGame(){
+  mutate(s=>{
+    s.status = 'running';
+    s.runStartedAt = nowTs();
+    s.log.push({id:uid(), ts:nowTs(), type:'system', text:'La partie démarre. Chronomètre lancé (1h15).'});
+  });
+}
+function togglePause(){
+  mutate(s=>{
+    if(s.status === 'running'){
+      s.elapsedBeforePause = elapsedSec(s);
+      s.status = 'paused';
+      s.log.push({id:uid(), ts:nowTs(), type:'system', text:'Partie mise en pause.'});
+    } else if(s.status === 'paused'){
+      s.status = 'running';
+      s.runStartedAt = nowTs();
+      s.log.push({id:uid(), ts:nowTs(), type:'system', text:'Partie reprise.'});
+    }
+  });
+}
+function endGameManually(){
+  mutate(s=>{
+    s.status = 'ended';
+    s.resultat = s.resultat || 'arret_mj';
+    s.log.push({id:uid(), ts:nowTs(), type:'system', text:'Le Maître du Jeu a mis fin à la partie.'});
+  });
+}
+function resetGame(){
+  if(!confirm('Réinitialiser complètement la partie pour ce code de session (même scénario) ?')) return;
+  mutate(s=>{
+    const fresh = freshState(s.code, s.scenarioId);
+    fresh.players = s.players;
+    Object.values(fresh.players).forEach(p=>{ p.hand = [
+      {instId: uid(), cardId: ACTION_CARDS[Math.floor(Math.random()*ACTION_CARDS.length)].id},
+      {instId: uid(), cardId: RESSOURCE_CARDS[Math.floor(Math.random()*RESSOURCE_CARDS.length)].id}
+    ]; p.lastDrawTour = -1; });
+    Object.assign(s, fresh);
+  });
+}
+
+function revealNextEvent(){
+  mutate(s=>{
+    const next = s.events.find(e=>e.status==='a_venir');
+    if(!next) return;
+    next.status = 'active';
+    if(next.startsRecurringReminder){ s.recurringReminder = next.startsRecurringReminder; }
+    s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: next.id, text:
+      '📨 Nouvel inject — '+next.titre+' ('+next.heure+') — demande reçue de : '+next.demandeDe});
+  });
+}
+
+function nextTour(){
+  mutate(s=>{
+    s.tour += 1;
+    s.events.filter(e=>e.status==='active').forEach(e=>{
+      e.toursSansSuite += 1;
+      if(e.toursSansSuite >= TOURS_AVANT_MALUS){
+        e.toursSansSuite = 0;
+        e.niveau = Math.min(MAX_NIVEAU, e.niveau + 1);
+        e.malusEvent += 1;
+        s.malusTotal += 1;
+        s.log.push({id:uid(), ts:nowTs(), type:'validation-ko', eventId:e.id, text:
+          '⏱️ '+e.titre+' non traité depuis '+TOURS_AVANT_MALUS+' tours : +1 malus, niveau '+NIVEAU_LABELS[e.niveau]+'.'});
+        if(e.niveau >= MAX_NIVEAU){ s.status = 'ended'; s.resultat = 'defaite_baro'; }
+      }
+    });
+    const next = s.events.find(e=>e.status==='a_venir');
+    if(next){
+      next.status = 'active';
+      if(next.startsRecurringReminder){ s.recurringReminder = next.startsRecurringReminder; }
+      s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: next.id, text:
+        '📨 Nouvel inject — '+next.titre+' ('+next.heure+') — demande reçue de : '+next.demandeDe});
+    }
+    if(s.recurringReminder){
+      s.log.push({id:uid(), ts:nowTs(), type:'system', text:'🔔 '+s.recurringReminder});
+    }
+    s.log.push({id:uid(), ts:nowTs(), type:'system', text:'— Tour '+s.tour+' —'});
+    checkVictory(s);
+  });
+}
+function checkVictory(s){
+  if(s.events.every(e=>e.status==='resolved')){ s.status = 'ended'; s.resultat = 'victoire'; }
+}
+
+function drawCard(type){
+  mutate(s=>{
+    const p = s.players[LOCAL.playerId];
+    if(!p) return;
+    if(p.lastDrawTour === s.tour){ alert('Vous avez déjà pioché une carte ce tour-ci.'); return; }
+    const pool = type==='action' ? ACTION_CARDS : RESSOURCE_CARDS;
+    const card = pool[Math.floor(Math.random()*pool.length)];
+    p.hand.push({instId: uid(), cardId: card.id});
+    p.lastDrawTour = s.tour;
+    s.log.push({id:uid(), ts:nowTs(), type:'system', text: LOCAL.playerName+' pioche une carte '+(type==='action'?'action':'ressource')+' : « '+card.label+' ».'});
+  });
+}
+
+function toggleCardSelect(instId){
+  LOCAL.selectedCards[instId] = !LOCAL.selectedCards[instId];
+  render();
+}
+
+function submitReply(eventId){
+  const ta = document.getElementById('reply-'+eventId);
+  const text = ta ? ta.value.trim() : '';
+  if(!text){ alert('Merci de décrire votre réponse avant envoi.'); return; }
+
+  const selectedInstIds = Object.keys(LOCAL.selectedCards).filter(k=>LOCAL.selectedCards[k]);
+  const p = LOCAL.state.players[LOCAL.playerId];
+  const playedCards = selectedInstIds.map(instId=>{
+    const handItem = p.hand.find(h=>h.instId===instId);
+    const def = handItem ? cardDef(handItem.cardId) : null;
+    return {instId, cardId: handItem ? handItem.cardId : null, label: def ? def.label : '?', precision: LOCAL.precisions[instId] || ''};
+  }).filter(c=>c.cardId);
+
+  const needsContact = playedCards.some(c=>{ const d=cardDef(c.cardId); return d && d.requiresContactSheet; });
+  if(needsContact && (!LOCAL.contactSheet || !contactSheetHasAtLeastOneActor(LOCAL.contactSheet))){
+    alert("La carte « Alerter/informer » nécessite de remplir la feuille interlocuteur (cochez au moins un acteur) avant l'envoi.");
+    return;
+  }
+  const missingPrecision = playedCards.find(c=>{ const d=cardDef(c.cardId); return d && d.requiresPrecision && !c.precision.trim(); });
+  if(missingPrecision){
+    alert('Merci de préciser : '+ (cardDef(missingPrecision.cardId).precisionLabel||'la précision requise') +' pour la carte « '+missingPrecision.label+' ».');
+    return;
+  }
+
+  mutate(s=>{
+    const pp = s.players[LOCAL.playerId];
+    s.submissions.push({
+      id: uid(), eventId, playerName: LOCAL.playerName, text,
+      ts: nowTs(), status:'pending',
+      cardsPlayed: playedCards,
+      contactSheet: needsContact ? LOCAL.contactSheet : null
+    });
+    if(pp){ pp.hand = pp.hand.filter(h=>!selectedInstIds.includes(h.instId)); }
+    const evt = s.events.find(e=>e.id===eventId);
+    s.log.push({id:uid(), ts:nowTs(), type:'validation-wait', eventId, text:
+      '✉️ '+LOCAL.playerName+' propose une réponse pour « '+(evt?evt.titre:'')+' »'+(playedCards.length?(' — cartes jouées : '+playedCards.map(c=>c.label).join(', ')):'')+'.'});
+  });
+  LOCAL.activeEventForReply = null;
+  LOCAL.draft = '';
+  LOCAL.selectedCards = {};
+  LOCAL.precisions = {};
+  LOCAL.contactSheet = null;
+}
+
+function contactSheetHasAtLeastOneActor(sheet){
+  if(!sheet || !sheet.actors) return false;
+  return Object.values(sheet.actors).some(a=>a.tel || a.mail);
+}
+function initContactSheetIfNeeded(eventId){
+  if(!LOCAL.contactSheet){
+    LOCAL.contactSheet = {eventId, elements:'', actors:{}};
+    ACTEURS_FEUILLE.forEach(a=>{ LOCAL.contactSheet.actors[a] = {tel:false, mail:false, precisions:''}; });
+  }
+}
+
+/* ----- MJ : transmission de documents ----- */
+function openDocEditor(eventId, docId, defaultContent){
+  LOCAL.openDocEditor = eventId+'|'+docId;
+  LOCAL.docDraft = defaultContent || '';
+  render();
+}
+function cancelDocEditor(){ LOCAL.openDocEditor = null; LOCAL.docDraft=''; render(); }
+function sendDocument(eventId, docId, label){
+  mutate(s=>{
+    s.log.push({id:uid(), ts:nowTs(), type:'document', eventId, text:
+      '📄 Document transmis — '+label+' : '+LOCAL.docDraft});
+  });
+  LOCAL.openDocEditor = null;
+  LOCAL.docDraft = '';
+}
+
+/* ----- MJ : correction / clôture d'un événement ----- */
+let MJ_CORRECTION_CHECKS = {};
+let MJ_MANUAL_MALUS = {};
+
+function toggleCorrectionCheck(eventId, idx){
+  MJ_CORRECTION_CHECKS[eventId] = MJ_CORRECTION_CHECKS[eventId] || {};
+  MJ_CORRECTION_CHECKS[eventId][idx] = !MJ_CORRECTION_CHECKS[eventId][idx];
+  render();
+}
+function setManualMalus(eventId, val){
+  MJ_MANUAL_MALUS[eventId] = Math.max(0, parseInt(val,10) || 0);
+}
+
+function computeMalusForEvent(evt){
+  if(!evt.correction || !evt.correction.length){
+    return MJ_MANUAL_MALUS[evt.id] || 0;
+  }
+  const checks = MJ_CORRECTION_CHECKS[evt.id] || {};
+  if(evt.correctionType === 'threshold'){
+    const total = evt.correction.length;
+    const present = evt.correction.filter((_,idx)=>checks[idx]).length;
+    const missing = total - present;
+    const scale = evt.thresholdScale || [];
+    for(const tier of scale){ if(missing <= tier.max) return tier.malus; }
+    return scale.length ? scale[scale.length-1].malus : 0;
+  }
+  let malus = 0;
+  evt.correction.forEach((item,idx)=>{
+    const checked = !!checks[idx];
+    if(item.malusOnChecked){ if(checked) malus += item.malus; }
+    else { if(!checked) malus += (item.malus||0); }
+  });
+  return malus;
+}
+
+function closeEvent(eventId){
+  mutate(s=>{
+    const evt = s.events.find(e=>e.id===eventId);
+    if(!evt) return;
+    const malus = computeMalusForEvent(evt);
+    evt.malusEvent += malus;
+    evt.niveau = Math.min(MAX_NIVEAU, malus>0 ? Math.max(evt.niveau,1) + (malus>=2?1:0) : evt.niveau);
+    evt.status = 'resolved';
+    s.malusTotal += malus;
+    s.log.push({id:uid(), ts:nowTs(), type: malus>0 ? 'validation-ko':'validation-ok', eventId,
+      text: (malus>0 ? '⚠️ ' : '✅ ') + evt.titre + ' clôturé — pénalités appliquées : ' + malus + '.'});
+    if(evt.niveau >= MAX_NIVEAU){ s.status='ended'; s.resultat='defaite_baro'; }
+    checkVictory(s);
+  });
+  delete MJ_CORRECTION_CHECKS[eventId];
+  delete MJ_MANUAL_MALUS[eventId];
+}
+function keepEventOpen(eventId){
+  mutate(s=>{
+    const evt = s.events.find(e=>e.id===eventId);
+    if(!evt) return;
+    s.log.push({id:uid(), ts:nowTs(), type:'validation-wait', eventId, text:
+      '🔁 '+evt.titre+' — cartes action/ressource jugées inadaptées, l’événement reste actif pour le tour suivant.'});
+  });
+}
+
+function malusAdjust(delta){ mutate(s=>{ s.malusTotal = Math.max(0, s.malusTotal + delta); }); }
+
+/* --------------------------------- render -------------------------------- */
+function render(){
+  const app = document.getElementById('app');
+  if(GRIST_ERROR){
+    app.innerHTML = renderGristError();
+    const btn = document.getElementById('btn-retry-grist');
+    if(btn) btn.onclick = ()=>{ GRIST_ERROR = null; boot(); };
+    return;
+  }
+  if(!GRIST_READY){ app.innerHTML = renderGristLoading(); return; }
+  if(LOCAL.screen === 'landing'){ app.innerHTML = renderLanding(); attachLandingHandlers(); return; }
+  const s = LOCAL.state;
+  if(!s) return;
+  if(s.status === 'ended'){ app.innerHTML = renderEnd(s); attachCommonHandlers(s); return; }
+  app.innerHTML = renderGame(s);
+  attachCommonHandlers(s);
+}
+
+function renderGristLoading(){
+  return `<div class="landing"><div class="landing-card" style="text-align:center;">
+    <p class="eyebrow">DDTactique</p>
+    <h1>Connexion à Grist…</h1>
+    <p style="margin-top:10px;">Initialisation de l'accès au document.</p>
+  </div></div>`;
+}
+function renderGristError(){
+  return `<div class="landing"><div class="landing-card">
+    <p class="eyebrow">DDTactique — erreur de connexion</p>
+    <h1>Grist non accessible</h1>
+    <p style="margin-top:10px;">${escapeHtml(GRIST_ERROR)}</p>
+    <div class="btn-row"><button class="btn accent" id="btn-retry-grist">↺ Réessayer</button></div>
+  </div></div>`;
+}
+
+function renderLanding(){
+  const scenarioPicker = LOCAL.role === 'mj' ? `
+      <div class="field">
+        <label>Scénario (pour une nouvelle partie)</label>
+        <div class="scenario-grid">
+          ${Object.entries(SCENARIOS).map(([id,sc])=>`
+            <div class="scenario-opt ${LOCAL.scenarioChoice===id?'active':''} ${sc.enConstruction?'disabled':''}" data-scenario="${id}">
+              <div class="so-title">${escapeHtml(sc.label)}${sc.enConstruction?'<span class="tag-soon">Bientôt disponible</span>':''}</div>
+              <div class="so-desc">${escapeHtml(sc.resume)}</div>
+            </div>`).join('')}
+        </div>
+        <div class="hint">Ignoré si le code saisi correspond à une partie déjà créée (le scénario de la session existante est conservé).</div>
+      </div>` : '';
+  return `
+  <div class="landing">
+    <div class="landing-card">
+      <p class="eyebrow">DDTactique — module réseau</p>
+      <h1>Cellule de crise DDT</h1>
+      <div class="sub">Serious game de gestion de crise — cadres d'astreinte</div>
+      <div class="role-toggle">
+        <button id="role-mj" class="${LOCAL.role==='mj'?'active':''}">Maître du Jeu</button>
+        <button id="role-joueur" class="${LOCAL.role==='joueur'?'active':''}">Joueur</button>
+      </div>
+      ${scenarioPicker}
+      <div class="field"><label>Code de partie</label>
+        <input id="in-code" placeholder="ex. CR7X — laissez vide pour créer une partie" value="${LOCAL.code}"></div>
+      <div class="field" id="name-field" style="${LOCAL.role==='mj'?'display:none':''}">
+        <label>Votre prénom / pseudo</label>
+        <input id="in-name" placeholder="ex. Camille" value="${LOCAL.playerName}"></div>
+      <button class="btn-primary" id="btn-go">${LOCAL.role==='mj' ? 'Créer / reprendre la partie' : 'Rejoindre la partie'}</button>
+      <div class="hint">Le Maître du Jeu crée la partie (en choisissant le scénario), puis communique le code aux joueurs (4 joueurs recommandés). Chacun ouvre ce même artifact, choisit son rôle, et saisit le code pour se synchroniser sur la même session.</div>
+    </div>
+  </div>`;
+}
+function attachLandingHandlers(){
+  document.getElementById('role-mj').onclick = ()=>{ LOCAL.role='mj'; render(); };
+  document.getElementById('role-joueur').onclick = ()=>{ LOCAL.role='joueur'; render(); };
+  document.getElementById('btn-go').onclick = createOrJoin;
+  document.querySelectorAll('[data-scenario]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.getAttribute('data-scenario');
+      if(SCENARIOS[id].enConstruction) return;
+      LOCAL.scenarioChoice = id; render();
+    };
+  });
+}
+
+function renderTimer(s){
+  const rem = remainingSec(s);
+  let cls = '';
+  if(rem < 600) cls='crit'; else if(rem < 1200) cls='warn';
+  return `<div class="timer ${cls}">${fmtTime(rem)}</div>`;
+}
+function renderGauge(niveauMax){
+  let segs = '';
+  for(let i=0;i<4;i++){ const on = i < niveauMax ? 'on-'+niveauClass(i) : ''; segs += `<div class="gauge-seg ${on}"></div>`; }
+  return `<div class="gauge-wrap"><div class="gauge-track">${segs}</div><span class="gauge-label">${NIVEAU_LABELS[Math.min(niveauMax,4)]}</span></div>`;
+}
+
+function renderGame(s){
+  const isMJ = LOCAL.role === 'mj';
+  const scenario = SCENARIOS[s.scenarioId] || {label:'?'};
+  const niveauGlobal = Math.max(0, ...s.events.map(e=>e.niveau), 0);
+  const activeEvents = s.events.filter(e=>e.status==='active');
+  const pendingEvents = s.events.filter(e=>e.status==='a_venir');
+  const resolvedEvents = s.events.filter(e=>e.status==='resolved');
+  const me = !isMJ ? s.players[LOCAL.playerId] : null;
+
+  return `
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="badge ${isMJ?'mj':''}">${isMJ?'MAÎTRE DU JEU':'JOUEUR · '+escapeHtml(LOCAL.playerName)}</span>
+      <span class="badge scenario">Scénario : ${escapeHtml(scenario.label)}</span>
+      <span class="badge">Session ${s.code}</span>
+      <span class="badge">Tour ${s.tour}</span>
+    </div>
+    <div class="topbar-left">${renderTimer(s)}${renderGauge(niveauGlobal)}</div>
+    <div class="topbar-right">
+      <span class="badge">Malus : ${s.malusTotal}</span>
+      ${isMJ ? `
+        ${s.status==='lobby' ? `<button class="iconbtn btn-primary" style="width:auto" id="btn-start">▶ Démarrer</button>` : ''}
+        ${s.status!=='lobby' ? `<button class="iconbtn" id="btn-pause">${s.status==='running'?'⏸ Pause':'▶ Reprendre'}</button>` : ''}
+        ${s.status!=='lobby' ? `<button class="iconbtn" id="btn-end">⏹ Terminer</button>` : ''}
+        <button class="iconbtn" id="btn-reset">↺ Réinitialiser</button>
+      ` : ''}
+    </div>
+  </div>
+
+  <div class="grid two-col">
+    <div>
+      ${s.status==='lobby' ? renderLobbyPanel(s, isMJ, scenario) : ''}
+
+      ${activeEvents.length ? `
+      <div class="panel">
+        <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le prochain inject</button>` : ''}</div>
+        ${activeEvents.map(e=>renderEventCard(e, isMJ, s)).join('')}
+      </div>` : `
+      <div class="panel">
+        <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le premier inject</button>` : ''}</div>
+        <div class="empty">Aucun inject actif pour le moment.${isMJ ? ' Cliquez sur « Envoyer le prochain inject » pour lancer le prochain événement.' : ' En attente du Maître du Jeu.'}</div>
+      </div>`}
+
+      ${isMJ ? `
+      <div class="panel">
+        <div class="panel-head"><h2>Contrôle du tour</h2></div>
+        ${s.recurringReminder ? `<div class="gm-note"><b>Rappel actif chaque tour</b>${escapeHtml(s.recurringReminder)}</div>` : ''}
+        <p style="margin:8px 0 8px;font-size:13px;">Clôturez le tour pour faire avancer les événements non traités sur le baromètre et révéler l'inject suivant.</p>
+        <div class="btn-row">
+          <button class="btn big accent" id="btn-next-tour" ${s.status!=='running'?'disabled':''}>⏭ Tour suivant</button>
+          <button class="btn" id="btn-malus-plus">+1 malus manuel</button>
+          <button class="btn" id="btn-malus-moins">−1 malus manuel</button>
+        </div>
+      </div>` : ''}
+
+      ${isMJ ? `
+      <div class="panel"><div class="panel-head"><h2>Grille de points</h2></div>${renderGrillePoints(s)}</div>` : ''}
+
+      ${pendingEvents.length ? `
+      <div class="panel"><div class="panel-head"><h2>Cartes événement restantes</h2></div>
+        <p style="font-size:13px;margin:0;">${pendingEvents.length} carte(s) événement en attente dans le paquet (contexte non visible avant tirage).</p>
+      </div>` : ''}
+
+      ${resolvedEvents.length ? `
+      <div class="panel"><div class="panel-head"><h2>Événements clos</h2></div>
+        ${resolvedEvents.map(e=>renderEventCard(e, isMJ, s)).join('')}
+      </div>` : ''}
+    </div>
+
+    <div>
+      ${!isMJ && me ? `
+      <div class="panel">
+        <div class="panel-head"><h2>Votre main</h2><span class="badge">${me.hand.length} carte(s)</span></div>
+        <div class="hand-zone">${me.hand.length ? me.hand.map(h=>renderHandCardStatic(h)).join('') : '<span class="hint">Main vide.</span>'}</div>
+        <div class="deck-btns">
+          <button class="btn" data-draw="action" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte action</button>
+          <button class="btn" data-draw="ressource" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte ressource</button>
+        </div>
+        <p class="hint">Une pioche par tour. Les cartes se jouent au moment d'envoyer une réponse à un inject actif.</p>
+      </div>` : ''}
+
+      <div class="panel">
+        <div class="panel-head"><h2>Cellule de crise</h2></div>
+        <div class="players-list">${Object.values(s.players).map(p=>`<span class="player-chip">${escapeHtml(p.name)} (${p.hand?p.hand.length:0} cartes)</span>`).join('') || '<span class="hint">Aucun joueur connecté.</span>'}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Journal de crise</h2></div>
+        <div class="log">${[...s.log].reverse().map(l=>`<div class="log-item ${l.type}"><span class="log-time">${fmtClock(l.ts)}</span>${escapeHtml(l.text)}</div>`).join('') || '<div class="empty">Le journal est vide.</div>'}</div>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+function renderHandCardStatic(h){
+  const def = cardDef(h.cardId);
+  if(!def) return '';
+  return `<div class="card ${def.type}"><span><span class="card-type">${def.type==='action'?'Action':'Ressource'}</span>${escapeHtml(def.label)}${def.detail?` <span style="color:var(--text-faint)">— ${escapeHtml(def.detail)}</span>`:''}</span></div>`;
+}
+
+function renderLobbyPanel(s, isMJ, scenario){
+  return `
+  <div class="panel">
+    <div class="panel-head"><h2>Mise en contexte (T0)</h2></div>
+    <div class="event-body">${escapeHtml(scenario.contexteT0)}</div>
+    ${scenario.preludeDocument ? `<div class="doc-box"><b>Document remis avant le premier tour</b><div class="doc-item">${escapeHtml(scenario.preludeDocument.label)}</div>${isMJ?`<div style="font-size:12px;color:var(--text-faint);white-space:pre-wrap;">${escapeHtml(scenario.preludeDocument.defaultContent)}</div>`:''}</div>` : ''}
+    ${isMJ ? `<div class="btn-row"><button class="btn big accent" id="btn-start-2">▶ Démarrer la partie (chrono 1h15)</button></div>`
+           : `<div class="empty">En attente que le Maître du Jeu démarre la partie…</div>`}
+  </div>`;
+}
+
+function renderGrillePoints(s){
+  return `
+  <table class="points-table">
+    <thead><tr><th>Carte</th><th>Événement traité ?</th><th>Nombre de pénalités</th></tr></thead>
+    <tbody>
+      ${s.events.map(e=>`<tr>
+        <td>Événement ${e.num} — ${escapeHtml(e.titre)}</td>
+        <td>${e.status==='resolved' ? '✅ Oui' : (e.status==='active' ? '⏳ En cours' : '— non tiré')}</td>
+        <td>${e.malusEvent}</td>
+      </tr>`).join('')}
+      <tr><td colspan="2">Total malus</td><td>${s.malusTotal}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+function renderEventCard(e, isMJ, s){
+  const resolved = e.status==='resolved';
+  const subs = s.submissions.filter(sub=>sub.eventId===e.id);
+  const lastStatusPill = resolved
+    ? `<span class="pill ${e.malusEvent>0?'ko':'ok'}">${e.malusEvent>0? e.malusEvent+' malus' : 'Traité — 0 malus'}</span>`
+    : (e.toursSansSuite>0 ? `<span class="pill wait">${e.toursSansSuite}/${TOURS_AVANT_MALUS} tours sans suite</span>` : '');
+
+  return `
+  <div class="event-card lvl-${e.niveau} ${resolved?'resolved':''}">
+    <div class="event-head">
+      <div>
+        <div class="event-num">CARTE ÉVÉNEMENT ${e.num} · ${e.heure}</div>
+        <div class="event-title">${escapeHtml(e.titre)}</div>
+        <div class="event-meta">Demande reçue de : ${escapeHtml(e.demandeDe)}</div>
+      </div>
+      <div style="text-align:right;">${renderGauge(e.niveau)}<div style="margin-top:6px;">${lastStatusPill}</div></div>
+    </div>
+    <div class="event-body">${escapeHtml(e.contexte)}</div>
+    <div class="event-defi"><b>Défi à relever</b>${escapeHtml(e.defi)}</div>
+    ${isMJ && e.gmNote ? `<div class="gm-note"><b>Note MJ (masquée aux joueurs)</b>${escapeHtml(e.gmNote)}</div>` : ''}
+
+    ${isMJ && e.documents && e.documents.length ? renderDocBox(e) : ''}
+
+    ${isMJ && !resolved ? renderCorrectionBox(e) : ''}
+
+    ${!isMJ && !resolved ? `
+      <div class="btn-row" style="margin-top:12px;">
+        ${LOCAL.activeEventForReply === e.id ? '' : `<button class="btn accent" data-reply-open="${e.id}">✍ Proposer une réponse</button>`}
+      </div>
+      ${LOCAL.activeEventForReply === e.id ? renderReplyForm(e, s) : ''}
+      ${subs.length ? `<div style="margin-top:10px;">${subs.map(sub=>renderSubMini(sub)).join('')}</div>` : ''}
+    ` : ''}
+
+    ${isMJ && subs.length ? `<div style="margin-top:10px;">${subs.map(sub=>renderSubMini(sub, true)).join('')}</div>` : ''}
+  </div>`;
+}
+
+function renderDocBox(e){
+  return `
+  <div class="doc-box">
+    <b>Documents mobilisables (à transmettre sur demande des joueurs)</b>
+    ${e.documents.map(d=>{
+      const key = e.id+'|'+d.id;
+      const isOpen = LOCAL.openDocEditor === key;
+      return `<div>
+        <div class="doc-item"><span>${escapeHtml(d.label)}</span>${isOpen?'':`<button class="btn doc" data-doc-open="${e.id}|${d.id}|${encodeURIComponent(d.defaultContent||'')}">Rédiger et transmettre</button>`}</div>
+        ${isOpen ? `<div class="doc-edit">
+          <textarea id="doc-editor-${e.id}-${d.id}">${escapeHtml(LOCAL.docDraft)}</textarea>
+          <div class="btn-row">
+            <button class="btn ok" data-doc-send="${e.id}|${d.id}|${encodeURIComponent(d.label)}">Transmettre au journal</button>
+            <button class="btn" data-doc-cancel="1">Annuler</button>
+          </div>
+        </div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderCorrectionBox(e){
+  if(!e.correction || !e.correction.length){
+    return `
+    <div class="correction-box">
+      <b>Fiche de correction MJ</b>
+      <div class="no-grille">${escapeHtml(NO_GRILLE_NOTE)}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:12.5px;">Malus à appliquer :</label>
+        <input type="number" min="0" class="malus-manual" data-manual-malus="${e.id}" value="${MJ_MANUAL_MALUS[e.id]||0}">
+      </div>
+      <div class="btn-row">
+        <button class="btn ok" data-close-event="${e.id}">✅ Clôturer et appliquer le malus</button>
+        <button class="btn wait" data-keep-open="${e.id}">🔁 Laisser en cours</button>
+      </div>
+    </div>`;
+  }
+  const checks = MJ_CORRECTION_CHECKS[e.id] || {};
+  const estMalus = computeMalusForEvent(e);
+  let itemsHtml = '';
+  if(e.correctionType === 'threshold'){
+    itemsHtml = e.correction.map((it,idx)=>`
+      <label class="correction-item"><input type="checkbox" data-corr="${e.id}|${idx}" ${checks[idx]?'checked':''}> ${escapeHtml(it.label)}</label>`).join('');
+    itemsHtml += `<div class="threshold-note">Malus selon éléments manquants — 0-1 : 0 · 2 : +1 · 3 : +2 · 4 ou + : +3 (calcul automatique)</div>`;
+  } else {
+    itemsHtml = e.correction.map((it,idx)=>`
+      <label class="correction-item"><input type="checkbox" data-corr="${e.id}|${idx}" ${checks[idx]?'checked':''}> ${escapeHtml(it.label)} <span class="malus-tag">${it.malusOnChecked? ('si coché : +'+it.malus) : ('si manquant : +'+(it.malus||0))}</span></label>`).join('');
+  }
+  return `
+  <div class="correction-box">
+    <b>Fiche de correction MJ — malus estimé : ${estMalus}</b>
+    ${itemsHtml}
+    <div class="btn-row">
+      <button class="btn ok" data-close-event="${e.id}">✅ Clôturer et appliquer ${estMalus} malus</button>
+      <button class="btn wait" data-keep-open="${e.id}">🔁 Laisser en cours (cartes inadaptées)</button>
+    </div>
+  </div>`;
+}
+
+function renderReplyForm(e, s){
+  const p = s.players[LOCAL.playerId];
+  const hand = p ? p.hand : [];
+  return `
+  <div style="margin-top:10px;">
+    <textarea class="reply" id="reply-${e.id}" placeholder="Décrivez l'action / la décision prise pour gérer cet événement…">${LOCAL.draft}</textarea>
+
+    ${hand.length ? `
+    <div style="margin-top:8px;">
+      <div class="hint" style="margin:0 0 6px;">Cartes à jouer avec cette réponse (optionnel) :</div>
+      <div class="hand-zone">${hand.map(h=>renderHandCardSelectable(h)).join('')}</div>
+    </div>` : ''}
+
+    ${needsContactSheetPreview(hand) ? renderContactSheetForm(e) : ''}
+
+    <div class="btn-row">
+      <button class="btn ok" data-reply-send="${e.id}">Envoyer au MJ</button>
+      <button class="btn" data-reply-cancel="1">Annuler</button>
+    </div>
+  </div>`;
+}
+function needsContactSheetPreview(hand){
+  return hand.some(h=>{ const inst=h.instId; if(!LOCAL.selectedCards[inst]) return false; const d=cardDef(h.cardId); return d && d.requiresContactSheet; });
+}
+
+function renderHandCardSelectable(h){
+  const def = cardDef(h.cardId);
+  if(!def) return '';
+  const checked = !!LOCAL.selectedCards[h.instId];
+  const needsPrec = def.requiresPrecision;
+  return `
+  <label class="card ${def.type}" style="cursor:pointer;">
+    <input type="checkbox" data-select-card="${h.instId}" ${checked?'checked':''}>
+    <span>
+      <span class="card-type">${def.type==='action'?'Action':'Ressource'}</span>
+      ${escapeHtml(def.label)}${def.detail?` <span style="color:var(--text-faint)">— ${escapeHtml(def.detail)}</span>`:''}
+      ${checked && needsPrec ? `<input type="text" class="precision" placeholder="${escapeHtml(def.precisionLabel||'Précisez…')}" data-precision="${h.instId}" value="${escapeHtml(LOCAL.precisions[h.instId]||'')}">` : ''}
+    </span>
+  </label>`;
+}
+
+function renderContactSheetForm(e){
+  initContactSheetIfNeeded(e.id);
+  const cs = LOCAL.contactSheet;
+  return `
+  <div class="contact-sheet">
+    <h4>Fiche contact — carte « Alerter / informer »</h4>
+    <div class="field" style="margin-bottom:8px;">
+      <label>Éléments à fournir</label>
+      <input type="text" id="cs-elements" value="${escapeHtml(cs.elements||'')}" placeholder="Ce que vous transmettez aux acteurs contactés">
+    </div>
+    <table class="contact-table">
+      <thead><tr><th>Acteurs à contacter</th><th>Tél.</th><th>Mail</th><th>Précisions</th></tr></thead>
+      <tbody>
+        ${ACTEURS_FEUILLE.map(a=>`
+        <tr>
+          <td class="actor-name">${escapeHtml(a)}</td>
+          <td><input type="checkbox" data-cs-tel="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].tel ? 'checked':''}></td>
+          <td><input type="checkbox" data-cs-mail="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].mail ? 'checked':''}></td>
+          <td><input type="text" data-cs-prec="${escapeHtml(a)}" value="${escapeHtml(cs.actors[a]?cs.actors[a].precisions:'')}"></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function renderSubMini(sub, forMJ){
+  const pillClass = sub.status==='pending' ? 'pending' : (sub.status==='validated_ok'?'ok':'wait');
+  const pillLabel = sub.status==='pending' ? 'En attente de correction MJ' : (sub.status==='validated_ok'?'Intégré':'Vu');
+  return `
+  <div class="sub-item">
+    <div class="sub-head"><span>${escapeHtml(sub.playerName)} · ${fmtClock(sub.ts)}</span><span class="pill ${pillClass}">${pillLabel}</span></div>
+    <div class="sub-text">${escapeHtml(sub.text)}</div>
+    ${sub.cardsPlayed && sub.cardsPlayed.length ? `<div class="sub-cards">${sub.cardsPlayed.map(c=>`<span class="pill pending" style="margin:2px 4px 0 0;">${escapeHtml(c.label)}${c.precision?(' : '+escapeHtml(c.precision)):''}</span>`).join('')}</div>` : ''}
+    ${sub.contactSheet ? renderContactSheetSummary(sub.contactSheet) : ''}
+  </div>`;
+}
+function renderContactSheetSummary(cs){
+  const rows = Object.entries(cs.actors).filter(([,v])=>v.tel||v.mail);
+  if(!rows.length) return '';
+  return `<div style="margin-top:6px;font-size:12px;color:var(--text-dim);">
+    <b style="color:var(--accent);">Feuille interlocuteur :</b> ${rows.map(([name,v])=>escapeHtml(name)+' ('+[v.tel?'tél.':null,v.mail?'mail':null].filter(Boolean).join('/')+(v.precisions?(' — '+escapeHtml(v.precisions)):'')+')').join(', ')}
+    ${cs.elements ? `<br><i>Éléments transmis : ${escapeHtml(cs.elements)}</i>`:''}
+  </div>`;
+}
+
+function renderEnd(s){
+  const scenario = SCENARIOS[s.scenarioId] || {label:'?'};
+  const titles = {
+    victoire: {t:'Victoire', c:'var(--vert)', d:"Tous les événements ont été traités avant la fin du temps imparti."},
+    defaite_baro: {t:'Défaite', c:'var(--rouge)', d:"Un événement a atteint le seuil maximum du baromètre."},
+    defaite_temps: {t:'Temps écoulé', c:'var(--jaune)', d:"Les 1h15 réglementaires sont dépassées."},
+    arret_mj: {t:'Partie arrêtée', c:'var(--text-dim)', d:"Le Maître du Jeu a mis fin à la partie."}
+  };
+  const info = titles[s.resultat] || titles.arret_mj;
+  const traites = s.events.filter(e=>e.status==='resolved').length;
+  return `
+  <div class="endscreen">
+    <p class="eyebrow">Fin de partie — scénario ${escapeHtml(scenario.label)} — session ${s.code}</p>
+    <div class="big-result" style="color:${info.c}">${info.t}</div>
+    <p>${info.d}</p>
+    <p style="font-family:var(--font-mono);font-size:13px;">Événements traités : ${traites} / ${s.events.length} · Malus cumulés : ${s.malusTotal} · Tours joués : ${s.tour}</p>
+    ${LOCAL.role==='mj' ? `<div class="panel" style="max-width:640px;margin:20px auto;text-align:left;">${renderGrillePoints(s)}</div>` : ''}
+    ${LOCAL.role==='mj' ? `<div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn big accent" id="btn-reset-end">↺ Nouvelle partie (même scénario, même code)</button></div>` : ''}
+  </div>`;
+}
+
+function escapeHtml(str){
+  return String(str==null?'':str).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ---------------------------- event handlers ---------------------------- */
+function attachCommonHandlers(s){
+  const byId = id => document.getElementById(id);
+
+  if(byId('btn-start')) byId('btn-start').onclick = startGame;
+  if(byId('btn-start-2')) byId('btn-start-2').onclick = startGame;
+  if(byId('btn-pause')) byId('btn-pause').onclick = togglePause;
+  if(byId('btn-end')) byId('btn-end').onclick = ()=>{ if(confirm('Terminer la partie maintenant ?')) endGameManually(); };
+  if(byId('btn-reset')) byId('btn-reset').onclick = resetGame;
+  if(byId('btn-reset-end')) byId('btn-reset-end').onclick = resetGame;
+  if(byId('btn-reveal')) byId('btn-reveal').onclick = revealNextEvent;
+  if(byId('btn-next-tour')) byId('btn-next-tour').onclick = nextTour;
+  if(byId('btn-malus-plus')) byId('btn-malus-plus').onclick = ()=>malusAdjust(1);
+  if(byId('btn-malus-moins')) byId('btn-malus-moins').onclick = ()=>malusAdjust(-1);
+
+  document.querySelectorAll('[data-draw]').forEach(btn=>{ btn.onclick = ()=>drawCard(btn.getAttribute('data-draw')); });
+
+  document.querySelectorAll('[data-reply-open]').forEach(btn=>{
+    btn.onclick = ()=>{ LOCAL.activeEventForReply = btn.getAttribute('data-reply-open'); LOCAL.draft=''; LOCAL.selectedCards={}; LOCAL.precisions={}; LOCAL.contactSheet=null; render(); };
+  });
+  document.querySelectorAll('[data-reply-cancel]').forEach(btn=>{
+    btn.onclick = ()=>{ LOCAL.activeEventForReply = null; LOCAL.draft=''; LOCAL.selectedCards={}; LOCAL.precisions={}; LOCAL.contactSheet=null; render(); };
+  });
+  document.querySelectorAll('[data-reply-send]').forEach(btn=>{ btn.onclick = ()=>submitReply(btn.getAttribute('data-reply-send')); });
+  document.querySelectorAll('[data-select-card]').forEach(cb=>{ cb.onchange = ()=>toggleCardSelect(cb.getAttribute('data-select-card')); });
+  document.querySelectorAll('[data-precision]').forEach(inp=>{ inp.oninput = ()=>{ LOCAL.precisions[inp.getAttribute('data-precision')] = inp.value; }; });
+  document.querySelectorAll('[data-corr]').forEach(cb=>{
+    cb.onchange = ()=>{ const [eid, idx] = cb.getAttribute('data-corr').split('|'); toggleCorrectionCheck(eid, parseInt(idx,10)); };
+  });
+  document.querySelectorAll('[data-manual-malus]').forEach(inp=>{
+    inp.oninput = ()=>{ setManualMalus(inp.getAttribute('data-manual-malus'), inp.value); };
+  });
+  if(byId('cs-elements')) byId('cs-elements').oninput = (ev)=>{ if(LOCAL.contactSheet) LOCAL.contactSheet.elements = ev.target.value; };
+  document.querySelectorAll('[data-cs-tel]').forEach(cb=>{
+    cb.onchange = ()=>{ const a=cb.getAttribute('data-cs-tel'); if(LOCAL.contactSheet){ LOCAL.contactSheet.actors[a]=LOCAL.contactSheet.actors[a]||{}; LOCAL.contactSheet.actors[a].tel = cb.checked; } };
+  });
+  document.querySelectorAll('[data-cs-mail]').forEach(cb=>{
+    cb.onchange = ()=>{ const a=cb.getAttribute('data-cs-mail'); if(LOCAL.contactSheet){ LOCAL.contactSheet.actors[a]=LOCAL.contactSheet.actors[a]||{}; LOCAL.contactSheet.actors[a].mail = cb.checked; } };
+  });
+  document.querySelectorAll('[data-cs-prec]').forEach(inp=>{
+    inp.oninput = ()=>{ const a=inp.getAttribute('data-cs-prec'); if(LOCAL.contactSheet){ LOCAL.contactSheet.actors[a]=LOCAL.contactSheet.actors[a]||{}; LOCAL.contactSheet.actors[a].precisions = inp.value; } };
+  });
+  document.querySelectorAll('[data-close-event]').forEach(btn=>{ btn.onclick = ()=>closeEvent(btn.getAttribute('data-close-event')); });
+  document.querySelectorAll('[data-keep-open]').forEach(btn=>{ btn.onclick = ()=>keepEventOpen(btn.getAttribute('data-keep-open')); });
+
+  document.querySelectorAll('[data-doc-open]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const [eventId, docId, encContent] = btn.getAttribute('data-doc-open').split('|');
+      openDocEditor(eventId, docId, decodeURIComponent(encContent));
+    };
+  });
+  document.querySelectorAll('[data-doc-cancel]').forEach(btn=>{ btn.onclick = cancelDocEditor; });
+  document.querySelectorAll('[data-doc-send]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const [eventId, docId, encLabel] = btn.getAttribute('data-doc-send').split('|');
+      const ta = byId('doc-editor-'+eventId+'-'+docId);
+      LOCAL.docDraft = ta ? ta.value : LOCAL.docDraft;
+      sendDocument(eventId, docId, decodeURIComponent(encLabel));
+    };
+  });
+  document.querySelectorAll('.doc-edit textarea').forEach(ta=>{ ta.oninput = ()=>{ LOCAL.docDraft = ta.value; }; });
+
+  document.querySelectorAll('textarea.reply').forEach(ta=>{ ta.oninput = ()=>{ LOCAL.draft = ta.value; }; });
+}
+
+/* auto refresh du chrono même sans changement de state (affichage seul) */
+setInterval(()=>{
+  if(LOCAL.screen==='game' && LOCAL.state && LOCAL.state.status==='running'){
+    if(remainingSec(LOCAL.state) <= 0 && LOCAL.state.status !== 'ended'){
+      mutate(s=>{ if(s.status==='running' && remainingSec(s)<=0){ s.status='ended'; s.resultat='defaite_temps'; } });
+    } else { render(); }
+  }
+}, 1000);
+
+boot();
+</script>
+</body>
+</html>
