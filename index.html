@@ -430,6 +430,7 @@ function freshState(code, scenarioId){
     resultat: null,
     recurringReminder: null,
     players: {},
+    playerStats: {}, // playerName -> {malus, evenementsAttribues, evenementsReussis}
     events: freshEvents(scenarioId),
     log: [],
     submissions: []
@@ -444,8 +445,13 @@ function freshState(code, scenarioId){
    simplement déplacée vers une table Grist pour permettre l'auto-hébergement
    et la synchronisation entre joueurs via le document partagé). ---------------------------- */
 const GRIST_TABLE = 'Sessions';
+const GRIST_JOURNAL_TABLE = 'Journal';
+const GRIST_EVENTS_TABLE = 'Evenements';
+const GRIST_EVAL_TABLE = 'Evaluation';
+let EVAL_SYNCED_PLAYTHROUGHS = new Set(); // "code|createdAt" déjà écrits, pour ne pas dupliquer à chaque partie rejouée sous le même code
 let GRIST_READY = false;
 let GRIST_ERROR = null;
+let SYNCED_LOG_IDS = new Set(); // évite de renvoyer en double les entrées déjà écrites dans Journal
 
 function rowRecordsToArray(rr){
   if(!rr || !rr.id) return [];
@@ -457,24 +463,130 @@ function rowRecordsToArray(rr){
   });
 }
 
+// Récupère la définition statique (scénario) d'un événement — utilisée
+// uniquement pour des champs qui ne sont pas éditables ligne à ligne dans
+// Grist (ex. le déclenchement d'un rappel récurrent).
+function getScenarioEventDef(scenarioId, num){
+  const scenario = SCENARIOS[scenarioId];
+  return scenario ? scenario.events[num-1] : null;
+}
+
+// Charge les 9 cartes événement d'une partie depuis la table Grist
+// "Evenements" — cette table fait autorité : le MJ peut modifier n'importe
+// quelle cellule directement dans Grist (texte, statut, niveau, malus...)
+// et ça se répercute dans le jeu au prochain rafraîchissement.
+async function loadEvents(code, scenarioId){
+  try{
+    const rr = await grist.docApi.fetchTable(GRIST_EVENTS_TABLE);
+    const rows = rowRecordsToArray(rr).filter(r=>r.Code===code).sort((a,b)=>(a.Num||0)-(b.Num||0));
+    if(!rows.length) return freshEvents(scenarioId); // table pas encore alimentée pour ce code
+    return rows.map(r=>({
+      id: 'evt'+r.Num, num: r.Num,
+      titre: r.Titre, heure: r.Heure, demandeDe: r.DemandeDe, contexte: r.Contexte, defi: r.Defi,
+      status: r.Statut || 'a_venir', niveau: r.Niveau||0, malusEvent: r.MalusEvent||0, toursSansSuite: r.ToursSansSuite||0,
+      _gristRowId: r.id
+    }));
+  }catch(e){
+    console.warn('Table Evenements inaccessible, repli sur le contenu du scénario :', e);
+    return freshEvents(scenarioId);
+  }
+}
+
+// Écrit l'état courant des 9 cartes événement dans la table "Evenements"
+// (une ligne par carte et par partie). Crée les lignes si elles n'existent
+// pas encore (nouvelle partie), les met à jour sinon.
+async function syncEventsToGrist(state){
+  try{
+    const rr = await grist.docApi.fetchTable(GRIST_EVENTS_TABLE);
+    const existingByNum = {};
+    rowRecordsToArray(rr).filter(r=>r.Code===state.code).forEach(r=>{ existingByNum[r.Num] = r; });
+    const actions = state.events.map(e=>{
+      const payload = {
+        Code: state.code, Num: e.num, Titre: e.titre, Heure: e.heure, DemandeDe: e.demandeDe,
+        Contexte: e.contexte, Defi: e.defi, Statut: e.status, Niveau: e.niveau,
+        MalusEvent: e.malusEvent, ToursSansSuite: e.toursSansSuite
+      };
+      const existing = existingByNum[e.num];
+      return existing ? ['UpdateRecord', GRIST_EVENTS_TABLE, existing.id, payload] : ['AddRecord', GRIST_EVENTS_TABLE, null, payload];
+    });
+    if(actions.length) await grist.docApi.applyUserActions(actions);
+  }catch(e){
+    console.warn('Table Evenements absente ou inaccessible — les cartes événement restent gérées uniquement dans le widget (non bloquant) :', e);
+  }
+}
+
 async function loadState(code){
   try{
     const rr = await grist.docApi.fetchTable(GRIST_TABLE);
     const row = rowRecordsToArray(rr).find(r=>r.Code === code);
-    return row ? JSON.parse(row.StateJson) : null;
+    if(!row) return null;
+    const state = JSON.parse(row.StateJson);
+    state.events = await loadEvents(code, state.scenarioId);
+    return state;
   }catch(e){ console.error('Grist loadState error', e); return null; }
 }
 async function saveState(state){
   try{
     const rr = await grist.docApi.fetchTable(GRIST_TABLE);
     const existing = rowRecordsToArray(rr).find(r=>r.Code === state.code);
-    const payload = {Code: state.code, ScenarioId: state.scenarioId, StateJson: JSON.stringify(state)};
+    const stateForJson = {...state};
+    delete stateForJson.events; // les événements vivent désormais dans leur propre table, éditable
+    const payload = {Code: state.code, ScenarioId: state.scenarioId, StateJson: JSON.stringify(stateForJson)};
     if(existing){
       await grist.docApi.applyUserActions([['UpdateRecord', GRIST_TABLE, existing.id, payload]]);
     } else {
       await grist.docApi.applyUserActions([['AddRecord', GRIST_TABLE, null, payload]]);
     }
   }catch(e){ console.error('Grist saveState error', e); alert("Erreur d'écriture dans Grist — vérifiez que le widget a bien l'accès complet (\"Full document access\") et que la table Sessions existe."); }
+  await syncEventsToGrist(state);
+  syncLogToGrist(state); // best-effort, ne bloque jamais le jeu si la table Journal est absente
+  syncEvaluationToGrist(state); // best-effort, ne bloque jamais le jeu si la table Evaluation est absente
+}
+
+// Écrit, une seule fois par partie terminée, une ligne de bilan individuel
+// par joueur dans la table Grist "Evaluation" — permet de comparer la
+// progression d'une partie à l'autre pour un même scénario.
+async function syncEvaluationToGrist(state){
+  if(state.status !== 'ended') return;
+  const playthroughKey = state.code + '|' + state.createdAt;
+  if(EVAL_SYNCED_PLAYTHROUGHS.has(playthroughKey)) return;
+  try{
+    const scenario = SCENARIOS[state.scenarioId] || {label: state.scenarioId};
+    const players = Object.values(state.players);
+    if(players.length){
+      const actions = players.map(p=>{
+        const st = (state.playerStats && state.playerStats[p.name]) || {malus:0, evenementsAttribues:0, evenementsReussis:0};
+        return ['AddRecord', GRIST_EVAL_TABLE, null, {
+          Code: state.code, ScenarioId: state.scenarioId, ScenarioLabel: scenario.label,
+          Date: new Date().toISOString(), Joueur: p.name,
+          MalusIndividuel: st.malus, EvenementsAttribues: st.evenementsAttribues, EvenementsReussis: st.evenementsReussis,
+          MalusEquipeTotal: state.malusTotal, ToursJoues: state.tour, Resultat: state.resultat || ''
+        }];
+      });
+      await grist.docApi.applyUserActions(actions);
+    }
+    EVAL_SYNCED_PLAYTHROUGHS.add(playthroughKey);
+  }catch(e){
+    console.warn('Table Evaluation absente ou inaccessible — le bilan individuel n’est pas archivé (non bloquant) :', e);
+  }
+}
+
+// Écrit chaque nouvelle entrée du journal (injects, soumissions, événements
+// système) comme une ligne distincte dans la table Grist "Journal", pour
+// qu'elle soit consultable directement dans Grist (Raw Data) — et pas
+// seulement noyée dans le StateJson de la table Sessions.
+async function syncLogToGrist(state){
+  try{
+    const newEntries = state.log.filter(l => !SYNCED_LOG_IDS.has(l.id));
+    if(!newEntries.length) return;
+    const actions = newEntries.map(l => ['AddRecord', GRIST_JOURNAL_TABLE, null, {
+      Code: state.code, Ts: l.ts, Type: l.type, EventId: l.eventId || '', Text: l.text
+    }]);
+    await grist.docApi.applyUserActions(actions);
+    newEntries.forEach(l => SYNCED_LOG_IDS.add(l.id));
+  }catch(e){
+    console.warn('Table Journal absente ou inaccessible — le journal reste visible dans le jeu mais pas dans Grist (non bloquant) :', e);
+  }
 }
 
 /* ------------------------------ app state ------------------------------ */
@@ -492,6 +604,7 @@ let LOCAL = {
   contactSheet: null,
   openDocEditor: null, // eventId|docId
   docDraft: '',
+  contextOpen: true,
   pollTimer: null,
   state: null
 };
@@ -541,6 +654,9 @@ async function createOrJoin(){
     }
     state = freshState(code, LOCAL.scenarioChoice);
   }
+  // Marque comme "déjà synchronisé" tout ce qui existe déjà dans le journal,
+  // pour ne pousser vers la table Journal que les nouvelles entrées à venir.
+  state.log.forEach(l=>SYNCED_LOG_IDS.add(l.id));
   if(LOCAL.role === 'joueur'){
     state.players[LOCAL.playerId] = {
       name: LOCAL.playerName, joinedAt: nowTs(), lastDrawTour: -1,
@@ -626,7 +742,8 @@ function revealNextEvent(){
     const next = s.events.find(e=>e.status==='a_venir');
     if(!next) return;
     next.status = 'active';
-    if(next.startsRecurringReminder){ s.recurringReminder = next.startsRecurringReminder; }
+    const def = getScenarioEventDef(s.scenarioId, next.num);
+    if(def && def.startsRecurringReminder){ s.recurringReminder = def.startsRecurringReminder; }
     s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: next.id, text:
       '📨 Nouvel inject — '+next.titre+' ('+next.heure+') — demande reçue de : '+next.demandeDe});
   });
@@ -650,7 +767,8 @@ function nextTour(){
     const next = s.events.find(e=>e.status==='a_venir');
     if(next){
       next.status = 'active';
-      if(next.startsRecurringReminder){ s.recurringReminder = next.startsRecurringReminder; }
+      const def = getScenarioEventDef(s.scenarioId, next.num);
+      if(def && def.startsRecurringReminder){ s.recurringReminder = def.startsRecurringReminder; }
       s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: next.id, text:
         '📨 Nouvel inject — '+next.titre+' ('+next.heure+') — demande reçue de : '+next.demandeDe});
     }
@@ -757,6 +875,7 @@ function sendDocument(eventId, docId, label){
 /* ----- MJ : correction / clôture d'un événement ----- */
 let MJ_CORRECTION_CHECKS = {};
 let MJ_MANUAL_MALUS = {};
+let MJ_ATTRIBUTED_PLAYER = {}; // eventId -> nom du joueur crédité/débité du résultat de cet événement
 
 function toggleCorrectionCheck(eventId, idx){
   MJ_CORRECTION_CHECKS[eventId] = MJ_CORRECTION_CHECKS[eventId] || {};
@@ -765,6 +884,22 @@ function toggleCorrectionCheck(eventId, idx){
 }
 function setManualMalus(eventId, val){
   MJ_MANUAL_MALUS[eventId] = Math.max(0, parseInt(val,10) || 0);
+}
+function setAttributedPlayer(eventId, name){
+  MJ_ATTRIBUTED_PLAYER[eventId] = name;
+}
+
+// Cumule, pour le bilan individuel de fin de partie, le malus et le nombre
+// d'événements attribués à un joueur donné (celui dont la réponse a servi
+// de base à la correction de cet événement).
+function attributeEventOutcome(s, playerName, malus){
+  if(!playerName) return; // "Équipe (non attribué)" — pas de score individuel pour cet événement
+  s.playerStats = s.playerStats || {};
+  const st = s.playerStats[playerName] || {malus:0, evenementsAttribues:0, evenementsReussis:0};
+  st.malus += malus;
+  st.evenementsAttribues += 1;
+  if(malus === 0) st.evenementsReussis += 1;
+  s.playerStats[playerName] = st;
 }
 
 function computeMalusForEvent(evt, mjData){
@@ -791,6 +926,7 @@ function computeMalusForEvent(evt, mjData){
 }
 
 function closeEvent(eventId){
+  const attributedPlayer = MJ_ATTRIBUTED_PLAYER[eventId] || null;
   mutate(s=>{
     const evt = s.events.find(e=>e.id===eventId);
     if(!evt) return;
@@ -800,13 +936,15 @@ function closeEvent(eventId){
     evt.niveau = Math.min(MAX_NIVEAU, malus>0 ? Math.max(evt.niveau,1) + (malus>=2?1:0) : evt.niveau);
     evt.status = 'resolved';
     s.malusTotal += malus;
+    attributeEventOutcome(s, attributedPlayer, malus);
     s.log.push({id:uid(), ts:nowTs(), type: malus>0 ? 'validation-ko':'validation-ok', eventId,
-      text: (malus>0 ? '⚠️ ' : '✅ ') + evt.titre + ' clôturé — pénalités appliquées : ' + malus + '.'});
+      text: (malus>0 ? '⚠️ ' : '✅ ') + evt.titre + ' clôturé — pénalités appliquées : ' + malus + (attributedPlayer ? ' — attribué à '+attributedPlayer : '') + '.'});
     if(evt.niveau >= MAX_NIVEAU){ s.status='ended'; s.resultat='defaite_baro'; }
     checkVictory(s);
   });
   delete MJ_CORRECTION_CHECKS[eventId];
   delete MJ_MANUAL_MALUS[eventId];
+  delete MJ_ATTRIBUTED_PLAYER[eventId];
 }
 function keepEventOpen(eventId){
   mutate(s=>{
@@ -1009,6 +1147,14 @@ function renderGame(s){
     </div>
 
     <div>
+      <div class="panel">
+        <div class="panel-head"><h2>Mise en contexte</h2><button class="btn" id="btn-toggle-context">${LOCAL.contextOpen?'Masquer':'Afficher'}</button></div>
+        ${LOCAL.contextOpen ? `
+          <div class="event-body">${escapeHtml(scenario.contexteT0)}</div>
+          ${scenario.preludeDocument ? `<div class="doc-box"><b>Document remis avant le premier tour</b><div class="doc-item">${escapeHtml(scenario.preludeDocument.label)}</div></div>` : ''}
+        ` : ''}
+      </div>
+
       ${!isMJ && me ? `
       <div class="panel">
         <div class="panel-head"><h2>Votre main</h2><span class="badge">${me.hand.length} carte(s)</span></div>
@@ -1091,7 +1237,7 @@ function renderEventCard(e, isMJ, canSeeMJData, s){
 
     ${isMJ && mjData && mjData.documents && mjData.documents.length ? renderDocBox(e, mjData) : ''}
 
-    ${isMJ && canSeeMJData && !resolved ? renderCorrectionBox(e, mjData) : ''}
+    ${isMJ && canSeeMJData && !resolved ? renderCorrectionBox(e, mjData, s) : ''}
 
     ${!isMJ && !resolved ? `
       <div class="btn-row" style="margin-top:12px;">
@@ -1126,13 +1272,28 @@ function renderDocBox(e, mjData){
   </div>`;
 }
 
-function renderCorrectionBox(e, mjData){
+function renderAttributionSelect(eventId, s){
+  const names = [...new Set(s.submissions.filter(sub=>sub.eventId===eventId).map(sub=>sub.playerName))];
+  const current = MJ_ATTRIBUTED_PLAYER[eventId] || '';
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <label style="font-size:12.5px;font-weight:600;">Attribuer ce résultat à :</label>
+    <select data-attribute-player="${eventId}" style="padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg-input);color:var(--text);font-size:12.5px;">
+      <option value="" ${current===''?'selected':''}>Équipe (non attribué)</option>
+      ${names.map(n=>`<option value="${escapeHtml(n)}" ${current===n?'selected':''}>${escapeHtml(n)}</option>`).join('')}
+    </select>
+    ${!names.length ? '<span class="hint" style="margin:0;">Aucune réponse soumise pour cet événement pour le moment.</span>' : ''}
+  </div>`;
+}
+
+function renderCorrectionBox(e, mjData, s){
   const correction = mjData ? mjData.correction : null;
   if(!correction || !correction.length){
     return `
     <div class="correction-box">
       <b>Fiche de correction MJ</b>
       <div class="no-grille">${escapeHtml(NO_GRILLE_NOTE)}</div>
+      ${renderAttributionSelect(e.id, s)}
       <div style="display:flex;align-items:center;gap:8px;">
         <label style="font-size:12.5px;">Malus à appliquer :</label>
         <input type="number" min="0" id="malus-manual-${e.id}" class="malus-manual" data-manual-malus="${e.id}" value="${MJ_MANUAL_MALUS[e.id]||0}">
@@ -1158,6 +1319,7 @@ function renderCorrectionBox(e, mjData){
   <div class="correction-box">
     <b>Fiche de correction MJ — malus estimé : ${estMalus}</b>
     ${itemsHtml}
+    ${renderAttributionSelect(e.id, s)}
     <div class="btn-row">
       <button class="btn ok" data-close-event="${e.id}">✅ Clôturer et appliquer ${estMalus} malus</button>
       <button class="btn wait" data-keep-open="${e.id}">🔁 Laisser en cours (cartes inadaptées)</button>
@@ -1201,7 +1363,7 @@ function renderHandCardSelectable(h){
     <span>
       <span class="card-type">${def.type==='action'?'Action':'Ressource'}</span>
       ${escapeHtml(def.label)}${def.detail?` <span style="color:var(--text-faint)">— ${escapeHtml(def.detail)}</span>`:''}
-      ${checked && needsPrec ? `<input type="text" class="precision" placeholder="${escapeHtml(def.precisionLabel||'Précisez…')}" data-precision="${h.instId}" value="${escapeHtml(LOCAL.precisions[h.instId]||'')}">` : ''}
+      ${checked && needsPrec ? `<input type="text" id="precision-${h.instId}" class="precision" placeholder="${escapeHtml(def.precisionLabel||'Précisez…')}" data-precision="${h.instId}" value="${escapeHtml(LOCAL.precisions[h.instId]||'')}">` : ''}
     </span>
   </label>`;
 }
@@ -1268,8 +1430,26 @@ function renderEnd(s){
     <p>${info.d}</p>
     <p style="font-family:var(--font-mono);font-size:13px;">Événements traités : ${traites} / ${s.events.length} · Malus cumulés : ${s.malusTotal} · Tours joués : ${s.tour}</p>
     ${LOCAL.role==='mj' ? `<div class="panel" style="max-width:640px;margin:20px auto;text-align:left;">${renderGrillePoints(s)}</div>` : ''}
+    ${LOCAL.role==='mj' ? `<div class="panel" style="max-width:640px;margin:16px auto;text-align:left;">${renderBilanIndividuel(s)}</div>` : ''}
     ${LOCAL.role==='mj' ? `<div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn big accent" id="btn-reset-end">↺ Nouvelle partie (même scénario, même code)</button></div>` : ''}
   </div>`;
+}
+
+function renderBilanIndividuel(s){
+  const players = Object.values(s.players);
+  if(!players.length){ return '<h2 style="margin-bottom:10px;">Bilan individuel</h2><div class="empty">Aucun joueur n\u2019a rejoint cette partie.</div>'; }
+  return `
+  <h2 style="margin-bottom:10px;">Bilan individuel</h2>
+  <table class="points-table">
+    <thead><tr><th>Joueur</th><th>Événements attribués</th><th>Réussis</th><th>Malus individuel</th></tr></thead>
+    <tbody>
+      ${players.map(p=>{
+        const st = (s.playerStats && s.playerStats[p.name]) || {malus:0, evenementsAttribues:0, evenementsReussis:0};
+        return `<tr><td>${escapeHtml(p.name)}</td><td>${st.evenementsAttribues}</td><td>${st.evenementsReussis}</td><td>${st.malus}</td></tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+  <p class="hint" style="margin-top:8px;">Ce bilan est archivé automatiquement dans la table Grist « Evaluation » à la fermeture de la partie, pour suivre la progression d'une partie à l'autre.</p>`;
 }
 
 function escapeHtml(str){
@@ -1290,6 +1470,7 @@ function attachCommonHandlers(s){
   if(byId('btn-next-tour')) byId('btn-next-tour').onclick = nextTour;
   if(byId('btn-malus-plus')) byId('btn-malus-plus').onclick = ()=>malusAdjust(1);
   if(byId('btn-malus-moins')) byId('btn-malus-moins').onclick = ()=>malusAdjust(-1);
+  if(byId('btn-toggle-context')) byId('btn-toggle-context').onclick = ()=>{ LOCAL.contextOpen = !LOCAL.contextOpen; render(); };
 
   document.querySelectorAll('[data-draw]').forEach(btn=>{ btn.onclick = ()=>drawCard(btn.getAttribute('data-draw')); });
 
@@ -1307,6 +1488,9 @@ function attachCommonHandlers(s){
   });
   document.querySelectorAll('[data-manual-malus]').forEach(inp=>{
     inp.oninput = ()=>{ setManualMalus(inp.getAttribute('data-manual-malus'), inp.value); };
+  });
+  document.querySelectorAll('[data-attribute-player]').forEach(sel=>{
+    sel.onchange = ()=>{ setAttributedPlayer(sel.getAttribute('data-attribute-player'), sel.value); };
   });
   if(byId('cs-elements')) byId('cs-elements').oninput = (ev)=>{ if(LOCAL.contactSheet) LOCAL.contactSheet.elements = ev.target.value; };
   document.querySelectorAll('[data-cs-tel]').forEach(cb=>{
