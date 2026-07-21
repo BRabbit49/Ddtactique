@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DDTactique</title>
-<!-- Adaptez cette URL selon votre instance Grist :
-     - grist.numerique.gouv.fr : https://grist.numerique.gouv.fr/grist-plugin-api.js
-     - instance auto-hébergée   : https://grist.votre-ddt.fr/grist-plugin-api.js -->
+<!-- Instance Grist utilisée : grist.numerique.gouv.fr -->
 <script src="https://grist.numerique.gouv.fr/grist-plugin-api.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -267,111 +265,42 @@ const SCENARIOS = {
     contexteT0: "Vous êtes d'astreinte depuis lundi, vous avez eu quelques appels mais aucune grosse situation. Nous sommes aujourd'hui le vendredi 4 juillet, cela fait 10 jours qu'il fait chaud (30°C en moyenne par jour).\n\nJeudi, vous avez été informé qu'une manifestation sur les restrictions d'eau aura lieu vendredi 4 juillet de 13h à 15h30. Environ 200 manifestants sont attendus sur le boulevard Foch et devant la mairie d'Angers.",
     preludeDocument: null,
     events: [
-      {
-        titre: "Carambolage A11 — PK 267 : organiser la déviation", heure: "15h10",
+      { titre: "Carambolage A11 — PK 267 : organiser la déviation", heure: "15h10",
         contexte: "Un carambolage s'est produit sur l'autoroute A11, au PK 267, sens Paris → Angers (sens 2). Un poids lourd transportant des moutons et dix véhicules légers sont impliqués. Le poids lourd s'est couché en portefeuille, bloquant totalement les deux voies du sens 2. Bilan humain : 2 morts, 8 blessés. Plusieurs moutons sont morts, blessés ou errent autour des voies. La tranchée couverte est fermée dans les deux sens. Cofiroute ne peut pas encore estimer la durée de l'incident.",
         demandeDe: "Cofiroute",
-        defi: "Proposez une déviation adaptée au carambolage. Identifiez les axes alternatifs et informez les acteurs concernés (Cofiroute, police, préfecture).",
-        correctionType: 'each',
-        correction: [
-          {label:"Déviation sens 1 proposée (Dev13 et Dev19)", malus:2},
-          {label:"Déviation sens 2 proposée (Dev14, Dev20 ou Dev49)", malus:2},
-          {label:"Acteurs informés — tél. : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC, DDPP (animaux errants) / mail : CMVOA + liste diffusion PGT A11", malus:1}
-        ]
-      },
-      {
-        titre: "Arrêté officiel de déviation", heure: "suite",
+        defi: "Proposez une déviation adaptée au carambolage. Identifiez les axes alternatifs et informez les acteurs concernés (Cofiroute, police, préfecture)." },
+      { titre: "Arrêté officiel de déviation", heure: "suite",
         contexte: "Suite au carambolage sur l'A11, la déviation doit être formalisée par un arrêté.",
         demandeDe: "SIDPC",
-        defi: "Rédigez l'arrêté officiel concernant la déviation. Assurez-vous de la légalité et de la clarté des mesures prises.",
-        correctionType: 'each',
-        correction: [ {label:"Acteurs informés par téléphone : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC", malus:1} ]
-      },
-      {
-        titre: "Moutons errants sur la chaussée", heure: "15h25",
+        defi: "Rédigez l'arrêté officiel concernant la déviation. Assurez-vous de la légalité et de la clarté des mesures prises." },
+      { titre: "Moutons errants sur la chaussée", heure: "15h25",
         contexte: "Des moutons errent sur les voies et accotements, augmentant le risque d'accidents secondaires.",
         demandeDe: "SIDPC / Gendarmerie",
-        defi: "Utilisez PARADES pour identifier les bétaillères disponibles. Coordonnez avec la DDPP et les éleveurs pour organiser l'évacuation des moutons.",
-        correctionType: 'each',
-        correction: [
-          {label:"Entreprises de bétaillères identifiées via PARADES (Guérineau Négoce Bétail, SARL Blin, SARL Jamin Stéphane, SARL Laurendeau, SA Transports Bâclé)", malus:2},
-          {label:"Directeur DDT informé de l'accident avant la fin du tour", malus:1}
-        ],
-        gmNote: "Chemin dans PARADES : Recensement / Recherches / Potentiel / Type de potentiel : Transport véhicules complémentaire / Camions bétaillères. Une fois les entreprises identifiées par les joueurs, informez-les que le SIDPC n'a finalement pas besoin d'activer la réquisition."
-      },
-      {
-        titre: "Manifestants hors itinéraire — fermeture des voies sur berges", heure: "15h50",
+        defi: "Utilisez PARADES pour identifier les bétaillères disponibles. Coordonnez avec la DDPP et les éleveurs pour organiser l'évacuation des moutons." },
+      { titre: "Manifestants hors itinéraire — fermeture des voies sur berges", heure: "15h50",
         contexte: "Un groupe de manifestants ne respecte plus l'itinéraire déclaré et s'approche des voies sur berges. Signalé par la police municipale. Le SIDPC demande la fermeture immédiate des voies sur berges.",
         demandeDe: "SIDPC",
-        defi: "Organisez la fermeture des voies sur berges. Proposez une déviation efficace. Communiquez avec les différents acteurs pour assurer la sécurité.",
-        correctionType: 'each',
-        correction: [
-          {label:"Déviation sens 1 proposée (Dev13 et Dev11)", malus:2},
-          {label:"Déviation sens 2 proposée (Dev14)", malus:2},
-          {label:"Acteurs informés — tél. : CD49, Cofiroute, ASF, Ville d'Angers, SIDPC / mail : liste diffusion PGT A11", malus:1}
-        ]
-      },
-      {
-        titre: "Saturation du réseau secondaire & automobilistes en détresse", heure: "16h15",
+        defi: "Organisez la fermeture des voies sur berges. Proposez une déviation efficace. Communiquez avec les différents acteurs pour assurer la sécurité." },
+      { titre: "Saturation du réseau secondaire & automobilistes en détresse", heure: "16h15",
         contexte: "Les axes de déviation sont saturés, provoquant de gros embouteillages ; certains véhicules empruntent des routes non autorisées. Par ailleurs, plusieurs automobilistes quittent leurs véhicules et errent sur l'autoroute, fatigués par la chaleur et le manque d'eau. Le SDIS vous sollicite directement pour l'acheminement d'eau.",
         demandeDe: "Cofiroute / SIDPC / SDIS",
-        defi: "Analysez la saturation du réseau secondaire et proposez une déviation complémentaire. Traitez la sollicitation du SDIS, et proposez un dispositif d'accueil pour les automobilistes bloqués (mairies, gymnases, etc.).",
-        correctionType: 'each',
-        correction: [
-          {label:"Pas de recherche/réquisition engagée suite à la demande directe du SDIS (redirigée vers le SIDPC)", malus:2},
-          {label:"Déviation complémentaire sens 1 proposée (Dev11 et Dev13)", malus:2},
-          {label:"Déviation complémentaire sens 2 proposée (Dev6 et Dev14)", malus:2}
-        ],
-        gmNote: "Le SDIS ne peut pas vous demander l'acheminement d'eau directement : il doit passer par le SIDPC. Seule la préfecture peut demander une recherche de réquisition ; le SIDPC répond aux joueurs de ne pas faire de recherches."
-      },
-      {
-        titre: "Pollution détectée", heure: "16h45",
+        defi: "Analysez la saturation du réseau secondaire et proposez une déviation complémentaire. Traitez la sollicitation du SDIS, et proposez un dispositif d'accueil pour les automobilistes bloqués (mairies, gymnases, etc.)." },
+      { titre: "Pollution détectée", heure: "16h45",
         contexte: "Une nappe irisée est signalée sur un ruisseau proche, probablement liée à l'accident (fuite de produits phytosanitaires).",
         demandeDe: "DREAL",
-        defi: "Coordonnez avec la DREAL, Cofiroute et la DDPP pour évaluer la pollution détectée. Proposez des mesures de confinement et d'analyse.",
-        correctionType: 'each',
-        correction: [
-          {label:"Cours d'eau correctement identifié : Le Brionneau", malus:2},
-          {label:"Acteurs informés : OFB, ARS, SEEB, DREAL", malus:1}
-        ]
-      },
-      {
-        titre: "Note de synthèse pour le cabinet du préfet", heure: "16h55",
+        defi: "Coordonnez avec la DREAL, Cofiroute et la DDPP pour évaluer la pollution détectée. Proposez des mesures de confinement et d'analyse." },
+      { titre: "Note de synthèse pour le cabinet du préfet", heure: "16h55",
         contexte: "Des élus locaux interpellent la préfecture. Une vidéo montrant les animaux morts et la situation des usagers circule sur les réseaux sociaux, provoquant un fort émoi. La gestion de la communication devient cruciale.",
         demandeDe: "Cabinet du préfet",
-        defi: "Préparez une note synthétique pour le cabinet du préfet, incluant la situation, les enjeux et les recommandations pour la communication publique.",
-        correctionType: 'threshold',
-        correction: [
-          {label:"Carambolage majeur à 15h10 sur l'A11 (PK 267, sens Paris → Province)"},
-          {label:"1 poids lourd transportant des moutons couché en portefeuille"},
-          {label:"10 véhicules légers impliqués"},
-          {label:"Bilan provisoire (2 morts, 8 blessés) — ⚠️ ce chiffre n'est pas à fournir par la DDT"},
-          {label:"Moutons morts, blessés ou errants"},
-          {label:"Fermeture de la tranchée couverte dans les deux sens"},
-          {label:"Automobilistes quittant leurs véhicules (chaleur, manque d'eau)"},
-          {label:"Retour à la normale prévu à 19h30 selon Cofiroute"},
-          {label:"Fuite de produits phytosanitaires (fongicide) dans un cours d'eau, pollution en cours d'identification"}
-        ],
-        thresholdScale: [{max:1,malus:0},{max:2,malus:1},{max:3,malus:2},{max:Infinity,malus:3}],
-        gmNote: "Les joueurs ne doivent pas rédiger le communiqué de presse eux-mêmes, seulement fournir les informations clés (le malus se calcule sur le nombre d'éléments manquants)."
-      },
-      {
-        titre: "Sollicitation pour intervenir en conférence de presse", heure: "suite",
+        defi: "Préparez une note synthétique pour le cabinet du préfet, incluant la situation, les enjeux et les recommandations pour la communication publique." },
+      { titre: "Sollicitation pour intervenir en conférence de presse", heure: "suite",
         contexte: "Le cabinet du préfet / le service communication vous sollicite pour vous rendre en personne au point presse, voire pour représenter la DDT en COD.",
         demandeDe: "Cabinet du préfet",
-        defi: "Décidez de la conduite à tenir face à cette sollicitation et justifiez votre position.",
-        correctionType: 'each',
-        correction: [ {label:"Les joueurs se rendent directement au point presse sans concertation préalable", malus:3, malusOnChecked:true} ],
-        gmNote: "Ce n'est pas dans le périmètre des missions/fonctions du cadre d'astreinte. La prise de parole publique relève du cabinet ou du service communication. Les joueurs peuvent fournir des éléments techniques, mais ne doivent pas intervenir en tant que porte-parole. Si les joueurs demandent l'avis du directeur DDT : celui-ci répond que non, ce n'est pas à eux d'y aller."
-      },
-      {
-        titre: "Retour à la normale — bilan post-incident", heure: "20h30",
+        defi: "Décidez de la conduite à tenir face à cette sollicitation et justifiez votre position." },
+      { titre: "Retour à la normale — bilan post-incident", heure: "20h30",
         contexte: "Après plusieurs heures de gestion de crise : les voies sur berges sont réouvertes progressivement, la tranchée couverte est réouverte après nettoyage et vérification des infrastructures, les animaux ont été évacués en sécurité, la circulation reprend progressivement sur le sens 2. Un bilan post-incident doit être réalisé.",
         demandeDe: "Préfecture",
-        defi: "Assurez-vous que toutes les parties prenantes sont informées du retour à la normale.",
-        correctionType: 'each',
-        correction: [ {label:"Acteurs informés : CD49, Cofiroute, ASF, Ville d'Angers, OFB, SIDPC", malus:1} ]
-      }
+        defi: "Assurez-vous que toutes les parties prenantes sont informées du retour à la normale." }
     ]
   },
 
@@ -381,120 +310,43 @@ const SCENARIOS = {
     contexteT0: "Nous sommes le vendredi 9 janvier à 9h30. Depuis une semaine, d'importantes pluies ont lieu, ce qui met les cours d'eau du Maine-et-Loire en tension. Le niveau des cours d'eau est élevé et les sols sont saturés. L'Oudon est en vigilance orange, les autres cours d'eau du Maine-et-Loire sont en jaune.",
     preludeDocument: {label:"Bulletin Vigicrues du 08/01/2026 (bulletin de la veille)", defaultContent:"[Bulletin Vigicrues du 08/01/2026 — contenu à joindre par le MJ avant le premier tour]"},
     events: [
-      {
-        titre: "Alerte pluies intenses — mobilisation à prévoir", heure: "Vendredi 9h30",
+      { titre: "Alerte pluies intenses — mobilisation à prévoir", heure: "Vendredi 9h30",
         contexte: "La mairie de Segré a reçu ce matin une alerte « pluies très intenses » via APIC. Le SIDPC alerte sur une forte mobilisation à prévoir durant le week-end.",
         demandeDe: "SIDPC",
-        defi: "Préparez-vous : anticipez la mobilisation du week-end.",
-        correctionType: 'each',
-        correction: [
-          {label:"Demande à la direction la mise en place de l'astreinte RDI (avec un agent TICSR et un agent PR)", malus:2},
-          {label:"Informe le SIDPC de l'organisation interne", malus:1}
-        ],
-        gmNote: "Si les joueurs ne demandent pas à mettre en place l'astreinte RDI : leur indiquer que le RSD impose la mise en place d'une astreinte RDI."
-      },
-      {
-        titre: "Vigicrues rouge sur l'Oudon", heure: "Vendredi 10h30",
+        defi: "Préparez-vous : anticipez la mobilisation du week-end." },
+      { titre: "Vigicrues rouge sur l'Oudon", heure: "Vendredi 10h30",
         contexte: "Un bulletin Vigicrues vient de tomber : l'Oudon est placé en vigilance rouge.",
         demandeDe: "SIDPC",
-        defi: "Réalisez une analyse des enjeux au plus vite.",
-        correctionType: 'each',
-        correction: [
-          {label:"Demande l'analyse des enjeux à l'astreinte RDI", malus:2},
-          {label:"Fournit cette analyse au SIDPC", malus:1}
-        ],
-        gmNote: "Si les joueurs demandent l'analyse des enjeux à l'astreinte RDI : la leur donner.",
-        documents: [{id:'doc-vigicrues-09', label:"Bulletin Vigicrues du 09/01/2026", defaultContent:"[Bulletin Vigicrues du 09/01/2026 — contenu à compléter par le MJ]"}]
-      },
-      {
-        titre: "Cellule de crise à distance — barrage fragilisé", heure: "Samedi 8h00",
+        defi: "Réalisez une analyse des enjeux au plus vite." },
+      { titre: "Cellule de crise à distance — barrage fragilisé", heure: "Samedi 8h00",
         contexte: "La nuit a été très pluvieuse, les niveaux d'eau ont augmenté. Une cellule de crise à distance est activée. Le barrage de Saint-Blaise (commune de Noyant-la-Gravoyère) montre les premiers signes de faiblesse.",
         demandeDe: "SIDPC",
         defi: "Réalisez une analyse des enjeux en cas de rupture du barrage. À partir de cet événement, un point d'actualité devra être réalisé à chaque tour de jeu.",
-        correctionType: 'each',
-        correction: [
-          {label:"Informe la direction de la DDT de la situation et de la mise en place d'une cellule de crise à distance", malus:1},
-          {label:"Demande l'analyse des enjeux à l'astreinte RDI", malus:2},
-          {label:"Fournit cette analyse au SIDPC", malus:1}
-        ],
-        gmNote: "Si les joueurs demandent l'analyse des enjeux à l'astreinte RDI : la leur donner.",
-        startsRecurringReminder: "Point d'actualité à réaliser ce tour (cellule de crise à distance activée)."
-      },
-      {
-        titre: "Construction d'un ouvrage de protection provisoire", heure: "Samedi 11h00",
+        startsRecurringReminder: "Point d'actualité à réaliser ce tour (cellule de crise à distance activée)." },
+      { titre: "Construction d'un ouvrage de protection provisoire", heure: "Samedi 11h00",
         contexte: "Suite à votre analyse des enjeux, la mairie de Segré a décidé de construire un ouvrage de protection provisoire.",
         demandeDe: "SIDPC",
-        defi: "Identifiez des entreprises disposant de sable pour la construction de l'ouvrage (via PARADES).",
-        correctionType: 'each',
-        correction: [
-          {label:"Entreprises identifiées (Constructions du Haut Anjou, Justeau Frères, SOC Terrassements Justeau)", malus:2},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "Chemin dans PARADES : Recensement / Recherches / Potentiel / Type de potentiel : Divers / Matériaux : sable.",
-        documents: [{id:'doc-vigicrues-10', label:"Bulletin Vigicrues du 10/01/2026", defaultContent:"[Bulletin Vigicrues du 10/01/2026 — contenu à compléter par le MJ]"}]
-      },
-      {
-        titre: "Réquisition d'entreprises — dérogation transport", heure: "Samedi 12h00",
+        defi: "Identifiez des entreprises disposant de sable pour la construction de l'ouvrage (via PARADES)." },
+      { titre: "Réquisition d'entreprises — dérogation transport", heure: "Samedi 12h00",
         contexte: "Le SIDPC active la réquisition d'entreprises pour la construction de l'ouvrage.",
         demandeDe: "SIDPC",
-        defi: "Trouvez la dérogation pour les poids lourds en circulation le dimanche pour l'entreprise Constructions du Haut Anjou.",
-        correctionType: 'each',
-        correction: [
-          {label:"Trouve le bon arrêté de dérogation de circulation PL le dimanche", malus:1},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "Donner aux joueurs les informations sur l'entreprise de BTP qui circulera le dimanche.",
-        documents: [{id:'doc-entreprise-bth', label:"Informations entreprise Constructions du Haut Anjou (circulation dominicale)", defaultContent:"[Informations à transmettre — à compléter par le MJ]"}]
-      },
-      {
-        titre: "Barrage partiellement cédé — sollicitation pour évaluer les réparations", heure: "Dimanche 10h00",
+        defi: "Trouvez la dérogation pour les poids lourds en circulation le dimanche pour l'entreprise Constructions du Haut Anjou." },
+      { titre: "Barrage partiellement cédé — sollicitation pour évaluer les réparations", heure: "Dimanche 10h00",
         contexte: "Le barrage de Saint-Blaise a partiellement cédé. L'ouvrage de protection provisoire a permis de réduire l'impact de la crue à Segré. Le gestionnaire de l'ouvrage vous sollicite pour évaluer les réparations d'urgence projetées.",
         demandeDe: "Gestionnaire de l'ouvrage",
-        defi: "Décidez de la conduite à tenir face à cette sollicitation : est-ce du ressort de la DDT ?",
-        correctionType: 'each',
-        correction: [
-          {label:"Les joueurs acceptent d'évaluer les réparations (ce n'est pas leur domaine d'expertise)", malus:2, malusOnChecked:true},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "Les joueurs doivent refuser : ce n'est pas dans leur domaine d'expertise. Donner aux joueurs le bulletin Vigicrues du 10/01/2026 et, s'ils le demandent, les informations sur les réparations envisagées par le gestionnaire.",
-        documents: [{id:'doc-vigicrues-10b', label:"Bulletin Vigicrues du 10/01/2026", defaultContent:"[Bulletin Vigicrues du 10/01/2026 — contenu à compléter par le MJ]"}, {id:'doc-reparations', label:"Informations réparations d'urgence (gestionnaire du barrage)", defaultContent:"[Informations à transmettre — à compléter par le MJ]"}]
-      },
-      {
-        titre: "Sollicitation spécifique — Le Lion-d'Angers", heure: "Dimanche 17h00",
+        defi: "Décidez de la conduite à tenir face à cette sollicitation : est-ce du ressort de la DDT ?" },
+      { titre: "Sollicitation spécifique — Le Lion-d'Angers", heure: "Dimanche 17h00",
         contexte: "La situation se stabilise temporairement. Le maire du Lion-d'Angers vous sollicite pour une analyse des enjeux propre à une hauteur d'eau de 2,56 m.",
         demandeDe: "Maire du Lion-d'Angers",
-        defi: "Décidez de la réponse à apporter à cette sollicitation spécifique.",
-        correctionType: 'each',
-        correction: [
-          {label:"Les joueurs acceptent la demande spécifique du maire", malus:2, malusOnChecked:true},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "Les joueurs doivent refuser de fournir une analyse des enjeux spécifique à cette hauteur d'eau et indiquer au maire du Lion-d'Angers qu'il doit se référer à l'analyse des enjeux générale : la DDT ne fait pas d'analyse spécifique pour chaque mairie."
-      },
-      {
-        titre: "Verglas à la trémie de Ramon", heure: "Dimanche 18h00",
+        defi: "Décidez de la réponse à apporter à cette sollicitation spécifique." },
+      { titre: "Verglas à la trémie de Ramon", heure: "Dimanche 18h00",
         contexte: "Les températures négatives combinées aux infiltrations d'eau provoquent une trop grande quantité de verglas au niveau de la trémie de Ramon à Angers. Cofiroute a neutralisé les voies à cet endroit.",
         demandeDe: "Cofiroute",
-        defi: "Décidez de la réponse à apporter face à cette perturbation (une déviation est-elle nécessaire ?).",
-        correctionType: 'each',
-        correction: [
-          {label:"Les joueurs mettent en place une déviation", malus:1, malusOnChecked:true},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "C'est un piège : il n'y a pas de déviation à mettre en place. Les automobilistes doivent sortir à l'échangeur de Saint-Serge puis redescendre après le rond-point pour reprendre les voies sur berges."
-      },
-      {
-        titre: "Décrue — retour à la normale", heure: "Lundi 8h00",
+        defi: "Décidez de la réponse à apporter face à cette perturbation (une déviation est-elle nécessaire ?)." },
+      { titre: "Décrue — retour à la normale", heure: "Lundi 8h00",
         contexte: "Durant la nuit, les niveaux d'eau ont baissé. Le pic semble passé.",
         demandeDe: "SIDPC",
-        defi: "Informez l'ensemble des acteurs concernés du retour à la normale.",
-        correctionType: 'each',
-        correction: [
-          {label:"Informe l'ensemble des acteurs concernés que le pic de crue est passé", malus:1},
-          {label:"Fait le point de situation pour la cellule de crise à distance", malus:1}
-        ],
-        gmNote: "La liste précise des acteurs à informer n'a pas été détaillée dans la fiche d'évaluation transmise — à compléter si besoin."
-      }
+        defi: "Informez l'ensemble des acteurs concernés du retour à la normale." }
     ]
   },
 
@@ -507,6 +359,39 @@ const SCENARIOS = {
     events: []
   }
 };
+
+/* ---- Données MJ sensibles (grille de correction, notes MJ, documents) ----
+   Ces données NE sont plus embarquées dans ce fichier : elles sont chargées
+   depuis la table Grist "ScenarioMJData", protégée par des Access Rules pour
+   n'être lisible que par les comptes Grist désignés comme Maîtres du Jeu.
+   MJ_DATA[scenarioId][eventNum] = {correctionType, correction, thresholdScale, gmNote, documents}
+   Reste `null` si l'utilisateur courant n'a pas les droits de lecture sur cette table. */
+let MJ_DATA = null;
+function getEventMJData(scenarioId, num){
+  return (MJ_DATA && MJ_DATA[scenarioId] && MJ_DATA[scenarioId][num]) || null;
+}
+async function loadMJData(){
+  try{
+    const rr = await grist.docApi.fetchTable('ScenarioMJData');
+    const rows = rowRecordsToArray(rr);
+    if(!rows.length){ MJ_DATA = null; return; }
+    const data = {};
+    rows.forEach(r=>{
+      data[r.ScenarioId] = data[r.ScenarioId] || {};
+      data[r.ScenarioId][r.EventNum] = {
+        correctionType: r.CorrectionType || 'each',
+        correction: JSON.parse(r.Correction || '[]'),
+        thresholdScale: r.ThresholdScale ? JSON.parse(r.ThresholdScale) : null,
+        gmNote: r.GmNote || '',
+        documents: r.Documents ? JSON.parse(r.Documents) : []
+      };
+    });
+    MJ_DATA = data;
+  }catch(e){
+    console.warn('ScenarioMJData non accessible (normal pour un compte joueur) :', e);
+    MJ_DATA = null;
+  }
+}
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function nowTs(){ return Date.now(); }
@@ -625,6 +510,10 @@ async function boot(){
     console.error('Grist init error', e);
     GRIST_ERROR = "Impossible d'accéder à la table « " + GRIST_TABLE + " ». Vérifiez : (1) qu'elle existe dans ce document Grist avec les colonnes Code / ScenarioId / StateJson (toutes en type Texte), (2) que ce widget a bien reçu l'accès complet au document (\"Full document access\" demandé à l'ajout du widget).";
   }
+  // Chargement (silencieux) de la grille de correction MJ. Un échec ici est
+  // normal et attendu pour un compte joueur : les Access Rules Grist doivent
+  // le refuser. Ça ne bloque jamais l'accès au jeu lui-même.
+  if(GRIST_READY){ await loadMJData(); }
   render();
 }
 
@@ -881,21 +770,22 @@ function setManualMalus(eventId, val){
   MJ_MANUAL_MALUS[eventId] = Math.max(0, parseInt(val,10) || 0);
 }
 
-function computeMalusForEvent(evt){
-  if(!evt.correction || !evt.correction.length){
+function computeMalusForEvent(evt, mjData){
+  const correction = mjData && mjData.correction ? mjData.correction : null;
+  if(!correction || !correction.length){
     return MJ_MANUAL_MALUS[evt.id] || 0;
   }
   const checks = MJ_CORRECTION_CHECKS[evt.id] || {};
-  if(evt.correctionType === 'threshold'){
-    const total = evt.correction.length;
-    const present = evt.correction.filter((_,idx)=>checks[idx]).length;
+  if(mjData.correctionType === 'threshold'){
+    const total = correction.length;
+    const present = correction.filter((_,idx)=>checks[idx]).length;
     const missing = total - present;
-    const scale = evt.thresholdScale || [];
+    const scale = mjData.thresholdScale || [];
     for(const tier of scale){ if(missing <= tier.max) return tier.malus; }
     return scale.length ? scale[scale.length-1].malus : 0;
   }
   let malus = 0;
-  evt.correction.forEach((item,idx)=>{
+  correction.forEach((item,idx)=>{
     const checked = !!checks[idx];
     if(item.malusOnChecked){ if(checked) malus += item.malus; }
     else { if(!checked) malus += (item.malus||0); }
@@ -907,7 +797,8 @@ function closeEvent(eventId){
   mutate(s=>{
     const evt = s.events.find(e=>e.id===eventId);
     if(!evt) return;
-    const malus = computeMalusForEvent(evt);
+    const mjData = getEventMJData(s.scenarioId, evt.num);
+    const malus = computeMalusForEvent(evt, mjData);
     evt.malusEvent += malus;
     evt.niveau = Math.min(MAX_NIVEAU, malus>0 ? Math.max(evt.niveau,1) + (malus>=2?1:0) : evt.niveau);
     evt.status = 'resolved';
@@ -1026,6 +917,7 @@ function renderGauge(niveauMax){
 
 function renderGame(s){
   const isMJ = LOCAL.role === 'mj';
+  const canSeeMJData = isMJ && !!MJ_DATA; // true seulement si l'accès Grist à ScenarioMJData a réussi
   const scenario = SCENARIOS[s.scenarioId] || {label:'?'};
   const niveauGlobal = Math.max(0, ...s.events.map(e=>e.niveau), 0);
   const activeEvents = s.events.filter(e=>e.status==='active');
@@ -1060,7 +952,7 @@ function renderGame(s){
       ${activeEvents.length ? `
       <div class="panel">
         <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le prochain inject</button>` : ''}</div>
-        ${activeEvents.map(e=>renderEventCard(e, isMJ, s)).join('')}
+        ${activeEvents.map(e=>renderEventCard(e, isMJ, canSeeMJData, s)).join('')}
       </div>` : `
       <div class="panel">
         <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le premier inject</button>` : ''}</div>
@@ -1089,7 +981,7 @@ function renderGame(s){
 
       ${resolvedEvents.length ? `
       <div class="panel"><div class="panel-head"><h2>Événements clos</h2></div>
-        ${resolvedEvents.map(e=>renderEventCard(e, isMJ, s)).join('')}
+        ${resolvedEvents.map(e=>renderEventCard(e, isMJ, canSeeMJData, s)).join('')}
       </div>` : ''}
     </div>
 
@@ -1151,9 +1043,10 @@ function renderGrillePoints(s){
   </table>`;
 }
 
-function renderEventCard(e, isMJ, s){
+function renderEventCard(e, isMJ, canSeeMJData, s){
   const resolved = e.status==='resolved';
   const subs = s.submissions.filter(sub=>sub.eventId===e.id);
+  const mjData = canSeeMJData ? getEventMJData(s.scenarioId, e.num) : null;
   const lastStatusPill = resolved
     ? `<span class="pill ${e.malusEvent>0?'ko':'ok'}">${e.malusEvent>0? e.malusEvent+' malus' : 'Traité — 0 malus'}</span>`
     : (e.toursSansSuite>0 ? `<span class="pill wait">${e.toursSansSuite}/${TOURS_AVANT_MALUS} tours sans suite</span>` : '');
@@ -1170,11 +1063,12 @@ function renderEventCard(e, isMJ, s){
     </div>
     <div class="event-body">${escapeHtml(e.contexte)}</div>
     <div class="event-defi"><b>Défi à relever</b>${escapeHtml(e.defi)}</div>
-    ${isMJ && e.gmNote ? `<div class="gm-note"><b>Note MJ (masquée aux joueurs)</b>${escapeHtml(e.gmNote)}</div>` : ''}
+    ${isMJ && !canSeeMJData ? `<div class="gm-note"><b>Accès MJ restreint</b>Votre compte Grist n'a pas les droits de lecture sur la table ScenarioMJData (grille de correction / notes MJ). Vérifiez les Access Rules si vous êtes bien Maître du Jeu.</div>` : ''}
+    ${isMJ && mjData && mjData.gmNote ? `<div class="gm-note"><b>Note MJ (masquée aux joueurs)</b>${escapeHtml(mjData.gmNote)}</div>` : ''}
 
-    ${isMJ && e.documents && e.documents.length ? renderDocBox(e) : ''}
+    ${isMJ && mjData && mjData.documents && mjData.documents.length ? renderDocBox(e, mjData) : ''}
 
-    ${isMJ && !resolved ? renderCorrectionBox(e) : ''}
+    ${isMJ && canSeeMJData && !resolved ? renderCorrectionBox(e, mjData) : ''}
 
     ${!isMJ && !resolved ? `
       <div class="btn-row" style="margin-top:12px;">
@@ -1188,11 +1082,11 @@ function renderEventCard(e, isMJ, s){
   </div>`;
 }
 
-function renderDocBox(e){
+function renderDocBox(e, mjData){
   return `
   <div class="doc-box">
     <b>Documents mobilisables (à transmettre sur demande des joueurs)</b>
-    ${e.documents.map(d=>{
+    ${mjData.documents.map(d=>{
       const key = e.id+'|'+d.id;
       const isOpen = LOCAL.openDocEditor === key;
       return `<div>
@@ -1209,8 +1103,9 @@ function renderDocBox(e){
   </div>`;
 }
 
-function renderCorrectionBox(e){
-  if(!e.correction || !e.correction.length){
+function renderCorrectionBox(e, mjData){
+  const correction = mjData ? mjData.correction : null;
+  if(!correction || !correction.length){
     return `
     <div class="correction-box">
       <b>Fiche de correction MJ</b>
@@ -1226,14 +1121,14 @@ function renderCorrectionBox(e){
     </div>`;
   }
   const checks = MJ_CORRECTION_CHECKS[e.id] || {};
-  const estMalus = computeMalusForEvent(e);
+  const estMalus = computeMalusForEvent(e, mjData);
   let itemsHtml = '';
-  if(e.correctionType === 'threshold'){
-    itemsHtml = e.correction.map((it,idx)=>`
+  if(mjData.correctionType === 'threshold'){
+    itemsHtml = correction.map((it,idx)=>`
       <label class="correction-item"><input type="checkbox" data-corr="${e.id}|${idx}" ${checks[idx]?'checked':''}> ${escapeHtml(it.label)}</label>`).join('');
     itemsHtml += `<div class="threshold-note">Malus selon éléments manquants — 0-1 : 0 · 2 : +1 · 3 : +2 · 4 ou + : +3 (calcul automatique)</div>`;
   } else {
-    itemsHtml = e.correction.map((it,idx)=>`
+    itemsHtml = correction.map((it,idx)=>`
       <label class="correction-item"><input type="checkbox" data-corr="${e.id}|${idx}" ${checks[idx]?'checked':''}> ${escapeHtml(it.label)} <span class="malus-tag">${it.malusOnChecked? ('si coché : +'+it.malus) : ('si manquant : +'+(it.malus||0))}</span></label>`).join('');
   }
   return `
