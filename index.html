@@ -821,6 +821,32 @@ function malusAdjust(delta){ mutate(s=>{ s.malusTotal = Math.max(0, s.malusTotal
 
 /* --------------------------------- render -------------------------------- */
 function render(){
+  // Préserve le focus et la position du curseur d'un champ texte en cours
+  // de saisie, car ce redessin complet est aussi déclenché automatiquement
+  // (rafraîchissement du chrono, synchronisation Grist) pendant que
+  // quelqu'un est en train d'écrire une réponse.
+  const active = document.activeElement;
+  let focusInfo = null;
+  if(active && active.id && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')){
+    focusInfo = {
+      id: active.id,
+      selStart: (typeof active.selectionStart === 'number') ? active.selectionStart : null,
+      selEnd: (typeof active.selectionEnd === 'number') ? active.selectionEnd : null
+    };
+  }
+  renderInternal();
+  if(focusInfo){
+    const el = document.getElementById(focusInfo.id);
+    if(el){
+      el.focus();
+      if(focusInfo.selStart !== null && el.setSelectionRange){
+        try{ el.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); }catch(e){}
+      }
+    }
+  }
+}
+
+function renderInternal(){
   const app = document.getElementById('app');
   if(GRIST_ERROR){
     app.innerHTML = renderGristError();
@@ -1109,7 +1135,7 @@ function renderCorrectionBox(e, mjData){
       <div class="no-grille">${escapeHtml(NO_GRILLE_NOTE)}</div>
       <div style="display:flex;align-items:center;gap:8px;">
         <label style="font-size:12.5px;">Malus à appliquer :</label>
-        <input type="number" min="0" class="malus-manual" data-manual-malus="${e.id}" value="${MJ_MANUAL_MALUS[e.id]||0}">
+        <input type="number" min="0" id="malus-manual-${e.id}" class="malus-manual" data-manual-malus="${e.id}" value="${MJ_MANUAL_MALUS[e.id]||0}">
       </div>
       <div class="btn-row">
         <button class="btn ok" data-close-event="${e.id}">✅ Clôturer et appliquer le malus</button>
@@ -1193,12 +1219,12 @@ function renderContactSheetForm(e){
     <table class="contact-table">
       <thead><tr><th>Acteurs à contacter</th><th>Tél.</th><th>Mail</th><th>Précisions</th></tr></thead>
       <tbody>
-        ${ACTEURS_FEUILLE.map(a=>`
+        ${ACTEURS_FEUILLE.map((a,idx)=>`
         <tr>
           <td class="actor-name">${escapeHtml(a)}</td>
-          <td><input type="checkbox" data-cs-tel="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].tel ? 'checked':''}></td>
-          <td><input type="checkbox" data-cs-mail="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].mail ? 'checked':''}></td>
-          <td><input type="text" data-cs-prec="${escapeHtml(a)}" value="${escapeHtml(cs.actors[a]?cs.actors[a].precisions:'')}"></td>
+          <td><input type="checkbox" id="cs-tel-${idx}" data-cs-tel="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].tel ? 'checked':''}></td>
+          <td><input type="checkbox" id="cs-mail-${idx}" data-cs-mail="${escapeHtml(a)}" ${cs.actors[a] && cs.actors[a].mail ? 'checked':''}></td>
+          <td><input type="text" id="cs-prec-${idx}" data-cs-prec="${escapeHtml(a)}" value="${escapeHtml(cs.actors[a]?cs.actors[a].precisions:'')}"></td>
         </tr>`).join('')}
       </tbody>
     </table>
