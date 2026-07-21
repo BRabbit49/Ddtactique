@@ -464,6 +464,7 @@ const GRIST_TABLE = 'Sessions';
 const GRIST_EVENTS_TABLE = 'Evenements';
 const GRIST_EVAL_TABLE = 'Evaluation';
 let EVAL_SYNCED_PLAYTHROUGHS = new Set(); // "code|createdAt" déjà écrits, pour ne pas dupliquer à chaque partie rejouée sous le même code
+let RESOURCE_SEEDED_SCENARIOS = new Set(); // évite de réinsérer les 9 lignes d'un scénario déjà présent dans Evenements
 let GRIST_READY = false;
 let GRIST_ERROR = null;
 
@@ -485,47 +486,51 @@ function getScenarioEventDef(scenarioId, num){
   return scenario ? scenario.events[num-1] : null;
 }
 
-// Charge les 9 cartes événement d'une partie depuis la table Grist
-// "Evenements" — cette table fait autorité : le MJ peut modifier n'importe
-// quelle cellule directement dans Grist (texte, statut, niveau, malus...)
-// et ça se répercute dans le jeu au prochain rafraîchissement.
-async function loadEvents(code, scenarioId){
+/* ---- Table "Evenements" : ressource PAR SCÉNARIO, pas par partie ----
+   Une ligne = un événement d'un scénario donné (clé ScenarioId + Num).
+   9 lignes par scénario, créées une seule fois (seedEventsResourceIfNeeded),
+   jamais dupliquées à chaque nouvelle partie. Le MJ peut modifier le texte
+   (Titre, Heure, DemandeDe, Contexte, Defi) directement dans Grist : le
+   changement s'applique à toutes les parties futures de ce scénario.
+   L'état vivant d'une partie précise (statut, niveau, malus, tours sans
+   suite) n'est PAS dans cette table : il reste dans StateJson (table
+   Sessions), propre à chaque partie. */
+async function loadEventContent(scenarioId){
   try{
     const rr = await grist.docApi.fetchTable(GRIST_EVENTS_TABLE);
-    const rows = rowRecordsToArray(rr).filter(r=>r.Code===code).sort((a,b)=>(a.Num||0)-(b.Num||0));
-    if(!rows.length) return freshEvents(scenarioId); // table pas encore alimentée pour ce code
-    return rows.map(r=>({
-      id: 'evt'+r.Num, num: r.Num,
-      titre: r.Titre, heure: r.Heure, demandeDe: r.DemandeDe, contexte: r.Contexte, defi: r.Defi,
-      status: r.Statut || 'a_venir', niveau: r.Niveau||0, malusEvent: r.MalusEvent||0, toursSansSuite: r.ToursSansSuite||0,
-      _gristRowId: r.id
-    }));
+    const rows = rowRecordsToArray(rr).filter(r=>r.ScenarioId===scenarioId).sort((a,b)=>(a.Num||0)-(b.Num||0));
+    if(!rows.length){
+      await seedEventsResourceIfNeeded(scenarioId);
+      return null; // le prochain chargement lira les lignes tout juste créées
+    }
+    const byNum = {};
+    rows.forEach(r=>{ byNum[r.Num] = {titre:r.Titre, heure:r.Heure, demandeDe:r.DemandeDe, contexte:r.Contexte, defi:r.Defi}; });
+    return byNum;
   }catch(e){
-    console.warn('Table Evenements inaccessible, repli sur le contenu du scénario :', e);
-    return freshEvents(scenarioId);
+    console.warn('Table Evenements inaccessible, repli sur le contenu embarqué du scénario :', e);
+    return null;
   }
 }
 
-// Écrit l'état courant des 9 cartes événement dans la table "Evenements"
-// (une ligne par carte et par partie). Crée les lignes si elles n'existent
-// pas encore (nouvelle partie), les met à jour sinon.
-async function syncEventsToGrist(state){
+// Crée une seule fois les 9 lignes de contenu d'un scénario dans Evenements,
+// si elles n'existent pas déjà — jamais réinséré ensuite, jamais par partie.
+async function seedEventsResourceIfNeeded(scenarioId){
+  const key = scenarioId;
+  if(RESOURCE_SEEDED_SCENARIOS.has(key)) return;
   try{
     const rr = await grist.docApi.fetchTable(GRIST_EVENTS_TABLE);
-    const existingByNum = {};
-    rowRecordsToArray(rr).filter(r=>r.Code===state.code).forEach(r=>{ existingByNum[r.Num] = r; });
-    const actions = state.events.map(e=>{
-      const payload = {
-        Code: state.code, Num: e.num, Titre: e.titre, Heure: e.heure, DemandeDe: e.demandeDe,
-        Contexte: e.contexte, Defi: e.defi, Statut: e.status, Niveau: e.niveau,
-        MalusEvent: e.malusEvent, ToursSansSuite: e.toursSansSuite
-      };
-      const existing = existingByNum[e.num];
-      return existing ? ['UpdateRecord', GRIST_EVENTS_TABLE, existing.id, payload] : ['AddRecord', GRIST_EVENTS_TABLE, null, payload];
-    });
-    if(actions.length) await grist.docApi.applyUserActions(actions);
+    const already = rowRecordsToArray(rr).some(r=>r.ScenarioId===scenarioId);
+    RESOURCE_SEEDED_SCENARIOS.add(key);
+    if(already) return;
+    const scenario = SCENARIOS[scenarioId];
+    if(!scenario) return;
+    const actions = scenario.events.map((e,i)=>['AddRecord', GRIST_EVENTS_TABLE, null, {
+      ScenarioId: scenarioId, Num: i+1, Titre: e.titre, Heure: e.heure, DemandeDe: e.demandeDe,
+      Contexte: e.contexte, Defi: e.defi
+    }]);
+    await grist.docApi.applyUserActions(actions);
   }catch(e){
-    console.warn('Table Evenements absente ou inaccessible — les cartes événement restent gérées uniquement dans le widget (non bloquant) :', e);
+    console.warn('Impossible d\u2019alimenter la table Evenements (non bloquant, le contenu embarqué du scénario est utilisé) :', e);
   }
 }
 
@@ -535,7 +540,16 @@ async function loadState(code){
     const row = rowRecordsToArray(rr).find(r=>r.Code === code);
     if(!row) return null;
     const state = JSON.parse(row.StateJson);
-    state.events = await loadEvents(code, state.scenarioId);
+    // Recharge le contenu (texte) des événements depuis la table-ressource
+    // Evenements, en ne touchant jamais au statut/niveau/malus vivants de
+    // cette partie (qui restent tels quels, stockés dans StateJson).
+    const content = await loadEventContent(state.scenarioId);
+    if(content){
+      state.events.forEach(e=>{
+        const c = content[e.num];
+        if(c){ e.titre=c.titre; e.heure=c.heure; e.demandeDe=c.demandeDe; e.contexte=c.contexte; e.defi=c.defi; }
+      });
+    }
     return state;
   }catch(e){ console.error('Grist loadState error', e); return null; }
 }
@@ -543,16 +557,13 @@ async function saveState(state){
   try{
     const rr = await grist.docApi.fetchTable(GRIST_TABLE);
     const existing = rowRecordsToArray(rr).find(r=>r.Code === state.code);
-    const stateForJson = {...state};
-    delete stateForJson.events; // les événements vivent désormais dans leur propre table, éditable
-    const payload = {Code: state.code, ScenarioId: state.scenarioId, StateJson: JSON.stringify(stateForJson)};
+    const payload = {Code: state.code, ScenarioId: state.scenarioId, StateJson: JSON.stringify(state)};
     if(existing){
       await grist.docApi.applyUserActions([['UpdateRecord', GRIST_TABLE, existing.id, payload]]);
     } else {
       await grist.docApi.applyUserActions([['AddRecord', GRIST_TABLE, null, payload]]);
     }
   }catch(e){ console.error('Grist saveState error', e); alert("Erreur d'écriture dans Grist — vérifiez que le widget a bien l'accès complet (\"Full document access\") et que la table Sessions existe."); }
-  await syncEventsToGrist(state);
   syncEvaluationToGrist(state); // best-effort, ne bloque jamais le jeu si la table Evaluation est absente
 }
 
@@ -1158,7 +1169,16 @@ function renderGame(s){
         <div class="panel-head"><h2>Mise en contexte</h2><button class="btn" id="btn-toggle-context">${LOCAL.contextOpen?'Masquer':'Afficher'}</button></div>
         ${LOCAL.contextOpen ? `
           <div class="event-body">${escapeHtml(scenario.contexteT0)}</div>
-          ${scenario.preludeDocument ? `<div class="doc-box"><b>Document remis avant le premier tour</b><div class="doc-item">${escapeHtml(scenario.preludeDocument.label)}</div></div>` : ''}
+          ${(()=>{
+            const preludeMjData = canSeeMJData ? getEventMJData(s.scenarioId, 0) : null;
+            if(isMJ && preludeMjData && preludeMjData.documents && preludeMjData.documents.length){
+              return renderDocBox({id:'prelude'}, preludeMjData);
+            }
+            if(scenario.preludeDocument){
+              return `<div class="doc-box"><b>Document à remettre avant le premier tour</b><div class="doc-item">${escapeHtml(scenario.preludeDocument.label)}</div></div>`;
+            }
+            return '';
+          })()}
         ` : ''}
       </div>
 
@@ -1198,7 +1218,7 @@ function renderLobbyPanel(s, isMJ, scenario){
   <div class="panel">
     <div class="panel-head"><h2>Mise en contexte (T0)</h2></div>
     <div class="event-body">${escapeHtml(scenario.contexteT0)}</div>
-    ${scenario.preludeDocument ? `<div class="doc-box"><b>Document remis avant le premier tour</b><div class="doc-item">${escapeHtml(scenario.preludeDocument.label)}</div>${isMJ?`<div style="font-size:12px;color:var(--text-faint);white-space:pre-wrap;">${escapeHtml(scenario.preludeDocument.defaultContent)}</div>`:''}</div>` : ''}
+    ${scenario.preludeDocument ? `<p class="hint">Le document à remettre avant le premier tour se trouve dans le panneau « Mise en contexte », en colonne de droite — transmettez-le dès maintenant, ou au plus tard à l'événement 1.</p>` : ''}
     ${isMJ ? `<div class="btn-row"><button class="btn big accent" id="btn-start-2">▶ Démarrer la partie (chrono 1h15)</button></div>`
            : `<div class="empty">En attente que le Maître du Jeu démarre la partie…</div>`}
   </div>`;
