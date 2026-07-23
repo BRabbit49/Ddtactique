@@ -865,8 +865,14 @@ function toggleCardSelect(instId){
 
 function submitReply(eventId){
   const ta = document.getElementById('reply-'+eventId);
-  const text = ta ? ta.value.trim() : '';
-  if(!text){ alert('Merci de décrire votre réponse avant envoi.'); return; }
+  let text = ta ? ta.value.trim() : '';
+  // Si le joueur a rempli "Éléments à fournir" dans la fiche interlocuteur
+  // mais a laissé le champ de description principal vide, on utilise ce
+  // texte-là plutôt que d'exiger une saisie en double.
+  if(!text && LOCAL.contactSheet && LOCAL.contactSheet.elements && LOCAL.contactSheet.elements.trim()){
+    text = LOCAL.contactSheet.elements.trim();
+  }
+  if(!text){ alert("Merci de décrire votre réponse avant envoi — dans le champ de texte principal, ou dans « Éléments à fournir » si vous utilisez la fiche interlocuteur."); return; }
 
   const selectedInstIds = Object.keys(LOCAL.selectedCards).filter(k=>LOCAL.selectedCards[k]);
   const p = LOCAL.state.players[LOCAL.playerId];
@@ -1036,10 +1042,11 @@ function malusAdjust(delta){ mutate(s=>{ s.malusTotal = Math.max(0, s.malusTotal
 
 /* --------------------------------- render -------------------------------- */
 function render(){
-  // Préserve le focus et la position du curseur d'un champ texte en cours
-  // de saisie, car ce redessin complet est aussi déclenché automatiquement
-  // (rafraîchissement du chrono, synchronisation Grist) pendant que
-  // quelqu'un est en train d'écrire une réponse.
+  // Préserve le focus, la position du curseur, et la position de défilement
+  // pendant qu'un champ texte est en cours de saisie, car ce redessin complet
+  // est aussi déclenché automatiquement (rafraîchissement du chrono,
+  // synchronisation Grist) — sans ça, un long formulaire (ex. fiche
+  // interlocuteur) revient en haut de la page en pleine saisie.
   const active = document.activeElement;
   let focusInfo = null;
   if(active && active.id && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')){
@@ -1049,6 +1056,7 @@ function render(){
       selEnd: (typeof active.selectionEnd === 'number') ? active.selectionEnd : null
     };
   }
+  const scrollY = window.scrollY;
   renderInternal();
   if(focusInfo){
     const el = document.getElementById(focusInfo.id);
@@ -1059,6 +1067,7 @@ function render(){
       }
     }
   }
+  window.scrollTo(0, scrollY);
 }
 
 function renderInternal(){
@@ -1622,6 +1631,7 @@ function renderReplyForm(e, s){
     </div>` : ''}
 
     ${needsContactSheetPreview(hand) ? renderContactSheetForm(e) : ''}
+    ${needsContactSheetPreview(hand) ? `<p class="hint">Le champ ci-dessus ou le champ « Éléments à fournir » de la fiche contact suffit — inutile de remplir les deux.</p>` : ''}
 
     <div class="btn-row">
       <button class="btn ok" data-reply-send="${e.id}">Envoyer au MJ</button>
