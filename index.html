@@ -726,10 +726,14 @@ async function createOrJoin(){
 
 let MUTATING = false; // vrai pendant qu'un clic MJ/joueur est en train d'écrire dans Grist
 
+function rulesModalActive(){
+  return LOCAL.role === 'joueur' && !LOCAL.rulesAcknowledged;
+}
+
 function startPolling(){
   if(LOCAL.pollTimer) clearInterval(LOCAL.pollTimer);
   LOCAL.pollTimer = setInterval(async ()=>{
-    if(MUTATING) return; // évite d'écraser un changement en cours d'écriture par une lecture concurrente
+    if(MUTATING || rulesModalActive()) return; // évite d'écraser un changement en cours, et de réinitialiser le défilement de l'écran des règles
     const s = await loadState(LOCAL.code);
     if(s){ LOCAL.state = s; render(); }
   }, POLL_MS);
@@ -1807,7 +1811,7 @@ function attachCommonHandlers(s){
 
 /* auto refresh du chrono même sans changement de state (affichage seul) */
 setInterval(()=>{
-  if(LOCAL.screen==='game' && LOCAL.state && LOCAL.state.status==='running'){
+  if(LOCAL.screen==='game' && LOCAL.state && LOCAL.state.status==='running' && !rulesModalActive()){
     if(remainingSec(LOCAL.state) <= 0 && LOCAL.state.status !== 'ended'){
       mutate(s=>{ if(s.status==='running' && remainingSec(s)<=0){ s.status='ended'; s.resultat='defaite_temps'; } });
     } else { render(); }
