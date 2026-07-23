@@ -768,6 +768,17 @@ function startGame(){
     s.status = 'running';
     s.runStartedAt = nowTs();
     s.log.push({id:uid(), ts:nowTs(), type:'system', text:'La partie démarre. Chronomètre lancé (1h15).'});
+    // Le premier inject est révélé automatiquement au démarrage ; les suivants
+    // ne le seront plus que via « Tour suivant », pour qu'un inject ne puisse
+    // jamais être envoyé sans faire progresser le tour.
+    const first = s.events.find(e=>e.status==='a_venir');
+    if(first){
+      first.status = 'active';
+      const def = getScenarioEventDef(s.scenarioId, first.num);
+      if(def && def.startsRecurringReminder){ s.recurringReminder = def.startsRecurringReminder; }
+      s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: first.id, text:
+        '📨 Premier inject — '+first.titre+' ('+first.heure+') — demande reçue de : '+first.demandeDe});
+    }
   });
 }
 function togglePause(){
@@ -803,17 +814,7 @@ function resetGame(){
   });
 }
 
-function revealNextEvent(){
-  mutate(s=>{
-    const next = s.events.find(e=>e.status==='a_venir');
-    if(!next) return;
-    next.status = 'active';
-    const def = getScenarioEventDef(s.scenarioId, next.num);
-    if(def && def.startsRecurringReminder){ s.recurringReminder = def.startsRecurringReminder; }
-    s.log.push({id:uid(), ts:nowTs(), type:'inject', eventId: next.id, text:
-      '📨 Nouvel inject — '+next.titre+' ('+next.heure+') — demande reçue de : '+next.demandeDe});
-  });
-}
+
 
 function nextTour(){
   mutate(s=>{
@@ -1043,6 +1044,18 @@ function keepEventOpen(eventId){
 }
 
 function malusAdjust(delta){ mutate(s=>{ s.malusTotal = Math.max(0, s.malusTotal + delta); }); }
+
+// Permet au MJ de corriger la fiche interlocuteur telle que soumise par un
+// joueur (ex. cocher un acteur oublié) avant de s'en servir pour la grille
+// de correction — la modification est appliquée directement à la soumission.
+function correctSubmissionActor(subId, actor, field, value){
+  mutate(s=>{
+    const sub = s.submissions.find(x=>x.id===subId);
+    if(!sub || !sub.contactSheet) return;
+    sub.contactSheet.actors[actor] = sub.contactSheet.actors[actor] || {tel:false, mail:false, precisions:''};
+    sub.contactSheet.actors[actor][field] = value;
+  });
+}
 
 /* --------------------------------- render -------------------------------- */
 function render(){
@@ -1383,12 +1396,12 @@ function renderGame(s){
 
       ${activeEvents.length ? `
       <div class="panel">
-        <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le prochain inject</button>` : ''}</div>
+        <div class="panel-head"><h2>Injects en cours</h2></div>
         ${activeEvents.map(e=>renderEventCard(e, isMJ, canSeeMJData, s)).join('')}
       </div>` : `
       <div class="panel">
-        <div class="panel-head"><h2>Injects en cours</h2>${isMJ && pendingEvents.length ? `<button class="btn accent" id="btn-reveal">📨 Envoyer le premier inject</button>` : ''}</div>
-        <div class="empty">Aucun inject actif pour le moment.${isMJ ? ' Cliquez sur « Envoyer le prochain inject » pour lancer le prochain événement.' : ' En attente du Maître du Jeu.'}</div>
+        <div class="panel-head"><h2>Injects en cours</h2></div>
+        <div class="empty">Aucun inject actif pour le moment.${isMJ && pendingEvents.length ? ' Cliquez sur « ⏭ Tour suivant » pour lancer le prochain événement.' : (!isMJ ? ' En attente du Maître du Jeu.' : '')}</div>
       </div>`}
 
       ${isMJ ? `
@@ -1696,7 +1709,7 @@ function renderSubMini(sub, forMJ){
     <div class="sub-head"><span>${escapeHtml(sub.playerName)} · ${fmtClock(sub.ts)}</span><span class="pill ${pillClass}">${pillLabel}</span></div>
     <div class="sub-text">${escapeHtml(sub.text)}</div>
     ${sub.cardsPlayed && sub.cardsPlayed.length ? `<div class="sub-cards">${sub.cardsPlayed.map(c=>`<span class="pill pending" style="margin:2px 4px 0 0;">${escapeHtml(c.label)}${c.precision?(' : '+escapeHtml(c.precision)):''}</span>`).join('')}</div>` : ''}
-    ${sub.contactSheet ? renderContactSheetSummary(sub.contactSheet) : ''}
+    ${sub.contactSheet ? (forMJ ? renderContactSheetEditable(sub) : renderContactSheetSummary(sub.contactSheet)) : ''}
   </div>`;
 }
 function renderContactSheetSummary(cs){
@@ -1705,6 +1718,32 @@ function renderContactSheetSummary(cs){
   return `<div style="margin-top:6px;font-size:12px;color:var(--text-dim);">
     <b style="color:var(--accent);">Feuille interlocuteur :</b> ${rows.map(([name,v])=>escapeHtml(name)+' ('+[v.tel?'tél.':null,v.mail?'mail':null].filter(Boolean).join('/')+(v.precisions?(' — '+escapeHtml(v.precisions)):'')+')').join(', ')}
     ${cs.elements ? `<br><i>Éléments transmis : ${escapeHtml(cs.elements)}</i>`:''}
+  </div>`;
+}
+// Version MJ : la fiche interlocuteur soumise reste éditable, pour corriger
+// un oubli du joueur avant de s'en servir dans la grille de correction
+// (ex. un acteur qui aurait dû être coché mais ne l'a pas été).
+function renderContactSheetEditable(sub){
+  const cs = sub.contactSheet;
+  const touched = Object.entries(cs.actors).filter(([,v])=>v.tel||v.mail||v.precisions);
+  const others = ACTEURS_FEUILLE.filter(a=>!touched.some(([name])=>name===a));
+  return `<div class="contact-sheet" style="margin-top:8px;">
+    <h4>Feuille interlocuteur soumise (corrigible)</h4>
+    ${cs.elements ? `<p style="font-size:12px;margin:0 0 8px;"><i>Éléments transmis : ${escapeHtml(cs.elements)}</i></p>` : ''}
+    <table class="contact-table">
+      <thead><tr><th>Acteur</th><th>Tél.</th><th>Mail</th><th>Précisions</th></tr></thead>
+      <tbody>
+        ${[...touched.map(([a])=>a), ...others].map(a=>{
+          const v = cs.actors[a] || {tel:false,mail:false,precisions:''};
+          return `<tr>
+            <td class="actor-name">${escapeHtml(a)}</td>
+            <td><input type="checkbox" data-sub-actor-tel="${sub.id}|${escapeHtml(a)}" ${v.tel?'checked':''}></td>
+            <td><input type="checkbox" data-sub-actor-mail="${sub.id}|${escapeHtml(a)}" ${v.mail?'checked':''}></td>
+            <td><input type="text" data-sub-actor-prec="${sub.id}|${escapeHtml(a)}" value="${escapeHtml(v.precisions||'')}"></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
   </div>`;
 }
 
@@ -1761,7 +1800,6 @@ function attachCommonHandlers(s){
   if(byId('btn-end')) byId('btn-end').onclick = ()=>{ if(confirm('Terminer la partie maintenant ?')) endGameManually(); };
   if(byId('btn-reset')) byId('btn-reset').onclick = resetGame;
   if(byId('btn-reset-end')) byId('btn-reset-end').onclick = resetGame;
-  if(byId('btn-reveal')) byId('btn-reveal').onclick = revealNextEvent;
   if(byId('btn-next-tour')) byId('btn-next-tour').onclick = nextTour;
   if(byId('btn-malus-plus')) byId('btn-malus-plus').onclick = ()=>malusAdjust(1);
   if(byId('btn-malus-moins')) byId('btn-malus-moins').onclick = ()=>malusAdjust(-1);
@@ -1786,6 +1824,15 @@ function attachCommonHandlers(s){
   });
   document.querySelectorAll('[data-attribute-player]').forEach(sel=>{
     sel.onchange = ()=>{ setAttributedPlayer(sel.getAttribute('data-attribute-player'), sel.value); };
+  });
+  document.querySelectorAll('[data-sub-actor-tel]').forEach(cb=>{
+    cb.onchange = ()=>{ const [subId,actor] = cb.getAttribute('data-sub-actor-tel').split('|'); correctSubmissionActor(subId, actor, 'tel', cb.checked); };
+  });
+  document.querySelectorAll('[data-sub-actor-mail]').forEach(cb=>{
+    cb.onchange = ()=>{ const [subId,actor] = cb.getAttribute('data-sub-actor-mail').split('|'); correctSubmissionActor(subId, actor, 'mail', cb.checked); };
+  });
+  document.querySelectorAll('[data-sub-actor-prec]').forEach(inp=>{
+    inp.onchange = ()=>{ const [subId,actor] = inp.getAttribute('data-sub-actor-prec').split('|'); correctSubmissionActor(subId, actor, 'precisions', inp.value); };
   });
   if(byId('cs-elements')) byId('cs-elements').oninput = (ev)=>{ if(LOCAL.contactSheet) LOCAL.contactSheet.elements = ev.target.value; };
   document.querySelectorAll('[data-cs-tel]').forEach(cb=>{
