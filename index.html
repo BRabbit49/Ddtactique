@@ -22,6 +22,7 @@
   --jaune:#a68200;
   --orange:#b34000;
   --rouge:#ce0500;
+  --bleu:#0063cb;
   --accent:#000091;
   --action-c:#0063cb;
   --ressource-c:#8d5b00;
@@ -90,6 +91,15 @@ a{color:var(--accent);}
 .gauge-seg.on-orange{background:var(--orange);}
 .gauge-seg.on-rouge{background:var(--rouge);}
 .gauge-label{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text-dim);}
+
+/* ---------- thermomètre de crise ---------- */
+.thermo-panel{display:flex;flex-direction:column;align-items:center;padding:20px 12px 16px;}
+.thermo-svg{display:block;width:100%;max-width:220px;height:auto;}
+.thermo-current-label{font-family:var(--font-display);font-weight:700;font-size:14px;margin-top:8px;text-align:center;}
+.thermo-current-label.crise{color:var(--rouge);animation:thermo-pulse 1.4s ease-in-out infinite;}
+@keyframes thermo-pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+.thermo-sub{font-size:11px;color:var(--text-faint);text-align:center;margin-top:2px;}
+
 
 /* ---------- layout ---------- */
 .grid{display:grid;grid-template-columns:1fr;gap:16px;}
@@ -223,7 +233,7 @@ input.malus-manual{width:70px;background:var(--bg-input);border:1px solid var(--
 const POLL_MS = 2500;
 const DUREE_PARTIE_SEC = 75 * 60; // 1h15 selon la règle du jeu
 const MAX_NIVEAU = 4; // 0 vert / 1 jaune / 2 orange / 3 rouge / 4 = défaite
-const NIVEAU_LABELS = ['Vert','Jaune','Orange','Rouge','DÉFAITE'];
+const NIVEAU_LABELS = ['Vert','Jaune','Orange','Rouge','Crise majeure'];
 const TOURS_AVANT_MALUS = 3; // carte non gérée 3 tours -> +1 malus (règle du jeu)
 
 /* ---- cartes réelles fournies (communes à tous les scénarios DDTactique) ---- */
@@ -348,12 +358,48 @@ const SCENARIOS = {
   },
 
   canicule: {
-    label: "Canicule",
-    resume: "Scénario en cours de construction — pas encore disponible.",
-    enConstruction: true,
-    contexteT0: "",
+    label: "Canicule / Incendie",
+    resume: "Vague de chaleur de 5 jours (mercredi à lundi) : ozone, incendie de massif, mortalité animale, cyanobactéries, routes dégradées, rupture d'eau potable.",
+    contexteT0: "Nous sommes mercredi matin. Une vague de chaleur intense touche le Maine-et-Loire depuis une semaine, avec des températures dépassant 38°C en journée depuis trois jours et des nuits n'offrant plus de répit (minimales supérieures à 24°C). Les sols sont très secs, les nappes et cours d'eau sont à des niveaux inhabituellement bas pour la saison. Météo-France ne prévoit pas d'amélioration avant au moins cinq jours. Les services de l'État sont en vigilance renforcée.",
     preludeDocument: null,
-    events: []
+    events: [
+      { titre: "Alerte à l'ozone en Maine-et-Loire", heure: "Mercredi 14h00",
+        contexte: "Le seuil d'information et de recommandation pour l'ozone est dépassé sur plusieurs stations de mesure du département. Air Pays de la Loire confirme un pic de pollution lié à la chaleur et à l'ensoleillement prolongé, susceptible de se maintenir plusieurs jours.",
+        demandeDe: "ARS / Préfecture",
+        defi: "Assurez la communication de l'alerte : informez les acteurs concernés et diffusez les recommandations et mesures adaptées aux publics sensibles et aux activités concernées." },
+      { titre: "Départ de feu dans le massif de la Breille-les-Pins", heure: "Mercredi 21h30",
+        contexte: "Un départ de feu est signalé en lisière du massif forestier de la Breille-les-Pins. La sécheresse des sous-bois et le vent favorisent une propagation rapide. Le SDIS engage des moyens importants sur place.",
+        demandeDe: "SDIS",
+        defi: "Analysez la situation et identifiez les mesures immédiates à prendre concernant l'accès au massif et l'information des communes riveraines." },
+      { titre: "Arrêté d'interdiction d'accès au massif", heure: "Jeudi 9h00",
+        contexte: "Le risque de reprise de feu et la poursuite des opérations d'extinction nécessitent de fermer temporairement le massif au public.",
+        demandeDe: "SDIS / Préfecture",
+        defi: "Rédigez l'arrêté portant interdiction d'accès au massif de la Breille-les-Pins et assurez-vous de sa diffusion aux acteurs concernés (communes, ONF, gendarmerie)." },
+      { titre: "Surmortalité dans les élevages de volailles et de porcs", heure: "Jeudi 16h00",
+        contexte: "Plusieurs élevages de volailles et de porcs signalent une surmortalité liée au stress thermique, dépassant les capacités d'enlèvement habituelles des équarrisseurs du secteur.",
+        demandeDe: "DDPP",
+        defi: "Utilisez PARADES pour identifier des bennes d'équarrissage disponibles en renfort, et coordonnez avec les éleveurs et la filière d'équarrissage pour organiser l'enlèvement des animaux." },
+      { titre: "Explosion des cyanobactéries dans la Mayenne", heure: "Vendredi 9h30",
+        contexte: "Une prolifération importante de cyanobactéries est constatée sur plusieurs points de la rivière la Mayenne, favorisée par les faibles débits et les fortes températures de l'eau. Un risque sanitaire est identifié pour les usages nautiques et halieutiques.",
+        demandeDe: "ARS / DREAL",
+        defi: "Diffusez un avis aux usagers et mettez en place les restrictions nécessaires : limitation des activités nautiques et interdiction de la pêche sur les secteurs concernés." },
+      { titre: "Dégradation d'itinéraires routiers départementaux", heure: "Vendredi 17h00",
+        contexte: "La chaleur extrême provoque des désordres sur plusieurs routes départementales (déformations de chaussée, faïençage important), rendant certains tronçons dangereux à la circulation.",
+        demandeDe: "CD49",
+        defi: "Identifiez les routes départementales concernées par la destruction de chaussée et les mesures de restriction ou de fermeture à mettre en place." },
+      { titre: "Fermeture de déviations du plan de gestion du trafic (PGT)", heure: "Samedi 11h00",
+        contexte: "Certains itinéraires de déviation prévus au PGT s'appuient justement sur les routes départementales endommagées la veille, les rendant inutilisables en cas de nouvel incident sur le réseau structurant.",
+        demandeDe: "CD49 / SIDPC",
+        defi: "Réévaluez les itinéraires de déviation du PGT affectés par la fermeture des RD concernées et proposez des itinéraires alternatifs, en informant les acteurs concernés." },
+      { titre: "Rupture d'approvisionnement en eau potable", heure: "Dimanche 8h00",
+        contexte: "Le niveau des eaux superficielles et des cours d'eau, extrêmement bas, compromet la capacité de production de plusieurs unités de distribution d'eau potable. Des coupures sont déjà constatées sur certaines communes.",
+        demandeDe: "ARS / SIDPC",
+        defi: "Organisez la réquisition de moyens de transport d'eau potable (camions-citernes) pour les communes les plus impactées." },
+      { titre: "Étude du matériel de potabilisation d'urgence", heure: "Lundi 9h00",
+        contexte: "Face à la persistance de la tension sur la ressource en eau, la préfecture souhaite disposer d'une solution plus durable que le seul transport par citernes.",
+        demandeDe: "ARS",
+        defi: "Étudiez la disponibilité de matériel de potabilisation d'urgence (unités mobiles de traitement) et proposez une solution adaptée à la situation." }
+    ]
   }
 };
 
@@ -611,6 +657,7 @@ let LOCAL = {
   openDocEditor: null, // eventId|docId
   docDraft: '',
   contextOpen: true,
+  rulesAcknowledged: false,
   pollTimer: null,
   state: null
 };
@@ -1022,6 +1069,12 @@ function renderInternal(){
   if(LOCAL.screen === 'landing'){ app.innerHTML = renderLanding(); attachLandingHandlers(); return; }
   const s = LOCAL.state;
   if(!s) return;
+  if(LOCAL.role === 'joueur' && !LOCAL.rulesAcknowledged){
+    app.innerHTML = renderRulesModal();
+    const btn = document.getElementById('btn-accept-rules');
+    if(btn) btn.onclick = ()=>{ LOCAL.rulesAcknowledged = true; render(); };
+    return;
+  }
   if(s.status === 'ended'){ app.innerHTML = renderEnd(s); attachCommonHandlers(s); return; }
   app.innerHTML = renderGame(s);
   attachCommonHandlers(s);
@@ -1041,6 +1094,62 @@ function renderGristError(){
     <p style="margin-top:10px;">${escapeHtml(GRIST_ERROR)}</p>
     <div class="btn-row"><button class="btn accent" id="btn-retry-grist">↺ Réessayer</button></div>
   </div></div>`;
+}
+
+function renderRulesModal(){
+  return `
+  <div class="landing">
+    <div class="landing-card" style="max-width:640px;max-height:88vh;overflow-y:auto;">
+      <p class="eyebrow">Avant de commencer</p>
+      <h1>Règles du jeu — DDTactique</h1>
+
+      <h3 style="margin-top:18px;">👥 Nombre de joueurs</h3>
+      <p>4 joueurs.</p>
+
+      <h3>🎯 Objectif du jeu</h3>
+      <ul style="margin:0 0 14px;padding-left:20px;color:var(--text-dim);">
+        <li>Réaliser un maximum de défis en 1h15.</li>
+        <li>Gérer correctement les événements pour qu'ils vous rapportent un maximum de points.</li>
+        <li>Ne pas dépasser le seuil maximum du baromètre.</li>
+      </ul>
+
+      <h3>🕹 Début de partie</h3>
+      <p>En début de partie, chaque joueur possède 1 carte ressource et 1 carte action.</p>
+
+      <h3>🕹 Déroulement d'un tour</h3>
+      <p style="margin-bottom:6px;"><b>Tirer les cartes :</b></p>
+      <ul style="margin:0 0 10px;padding-left:20px;color:var(--text-dim);">
+        <li>Le Maître du Jeu retourne 1 carte événement.</li>
+        <li>Chaque joueur pioche 1 carte Action ou 1 carte Ressource.</li>
+      </ul>
+      <p style="margin-bottom:6px;"><b>Défausse et activation :</b> lorsqu'une carte est défaussée, son pouvoir est activé.</p>
+      <p style="margin-bottom:6px;"><b>Gestion des événements :</b> à chaque carte événement, il est demandé de réaliser certaines choses. Pour cela, défaussez vos cartes ressources et actions, qui activent leurs pouvoirs. À la fin d'un tour, plusieurs possibilités selon l'avancée de la carte événement :</p>
+      <ul style="margin:0 0 10px;padding-left:20px;color:var(--text-dim);">
+        <li>La carte événement est correctement traitée : elle est retirée du baromètre, vous marquez des points.</li>
+        <li>Vous pensez l'avoir correctement traitée, mais elle est mal réalisée (éléments manquants, mauvaises décisions) : elle avance dans le baromètre. Le Maître du Jeu ne vous indique pas les erreurs — vous devrez continuer de la traiter au tour suivant.</li>
+        <li>Vous n'avez pas les bonnes cartes pour la gérer : vous passez au tour suivant, la carte reste au même niveau.</li>
+      </ul>
+      <p>Si des cartes événement restent en cours et non traitées à la fin de la partie, aucun point n'est marqué pour elles.</p>
+
+      <h3>⏱ Fin du jeu</h3>
+      <ul style="margin:0 0 14px;padding-left:20px;color:var(--text-dim);">
+        <li>Si les 1h15 sont dépassées.</li>
+        <li>Si une carte événement atteint le seuil maximum du baromètre.</li>
+        <li>Si l'ensemble des événements sont traités correctement.</li>
+      </ul>
+
+      <h3>🏆 Conditions de victoire ou défaite</h3>
+      <ul style="margin:0 0 6px;padding-left:20px;color:var(--text-dim);">
+        <li>Défaite si le seuil maximum du baromètre est atteint.</li>
+        <li>Victoire si l'ensemble des événements sont gérés correctement.</li>
+        <li>Le score dépend du nombre d'événements gérés et des erreurs commises : plus il y a d'éléments manquants ou d'erreurs, moins vous marquez de points.</li>
+      </ul>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn big accent" id="btn-accept-rules" style="width:100%;">J'ai compris les règles — accéder à la partie</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderLanding(){
@@ -1100,6 +1209,78 @@ function renderGauge(niveauMax){
   let segs = '';
   for(let i=0;i<4;i++){ const on = i < niveauMax ? 'on-'+niveauClass(i) : ''; segs += `<div class="gauge-seg ${on}"></div>`; }
   return `<div class="gauge-wrap"><div class="gauge-track">${segs}</div><span class="gauge-label">${NIVEAU_LABELS[Math.min(niveauMax,4)]}</span></div>`;
+}
+
+// Couleur pleine de chaque palier du thermomètre : 0 bleu (calme) → 4 rouge (crise majeure)
+const THERMO_COLORS = ['var(--bleu)','var(--vert)','var(--jaune)','var(--orange)','var(--rouge)'];
+
+function renderThermometer(niveau, events){
+  niveau = Math.max(0, Math.min(niveau, MAX_NIVEAU));
+  const tubeTop = 14, tubeBottom = 210, tubeHeight = tubeBottom - tubeTop;
+  const fillTop = tubeBottom - (niveau / MAX_NIVEAU) * tubeHeight;
+  const currentColor = THERMO_COLORS[niveau];
+  const isCrise = niveau >= MAX_NIVEAU;
+  // repères des 5 paliers (0 à 4) le long du tube
+  let ticks = '';
+  for(let i=0; i<=MAX_NIVEAU; i++){
+    const y = tubeBottom - (i / MAX_NIVEAU) * tubeHeight;
+    ticks += `<line x1="46" y1="${y}" x2="52" y2="${y}" stroke="var(--text-faint)" stroke-width="1.5"/>
+      <text x="56" y="${y+4}" font-size="10" font-family="Public Sans, sans-serif" fill="var(--text-faint)">${i}</text>`;
+  }
+  // repères par événement : un pastille numérotée par carte active ou résolue,
+  // positionnée sur le tube selon SON PROPRE niveau — pour que les joueurs
+  // situent chaque inject, même quand un nouveau vient s'ajouter aux autres.
+  const plottable = (events||[]).filter(e=>e.status==='active' || e.status==='resolved');
+  const byNiveau = {};
+  plottable.forEach(e=>{ (byNiveau[e.niveau] = byNiveau[e.niveau]||[]).push(e); });
+  let markers = '';
+  Object.keys(byNiveau).forEach(nvStr=>{
+    const nv = parseInt(nvStr,10);
+    const y = tubeBottom - (nv / MAX_NIVEAU) * tubeHeight;
+    byNiveau[nv].forEach((e,idx)=>{
+      const x = 84 + idx*26;
+      const resolved = e.status==='resolved';
+      const col = THERMO_COLORS[Math.min(nv,MAX_NIVEAU)];
+      const title = 'Événement '+e.num+' — '+e.titre+' — '+(resolved?'résolu':'actif')+', niveau '+NIVEAU_LABELS[Math.min(nv,MAX_NIVEAU)];
+      markers += `<g>
+        <title>${escapeHtml(title)}</title>
+        <circle cx="${x}" cy="${y}" r="11" fill="${resolved?'var(--bg-panel)':col}" stroke="${col}" stroke-width="2" opacity="${resolved?0.6:1}"/>
+        <text x="${x}" y="${y+4}" font-size="10.5" font-weight="700" font-family="Public Sans, sans-serif" text-anchor="middle" fill="${resolved?col:'#ffffff'}">${e.num}</text>
+        ${resolved?`<text x="${x+10}" y="${y-8}" font-size="10" fill="var(--vert)">✓</text>`:''}
+      </g>`;
+    });
+  });
+  const maxPerRow = Math.max(1, ...Object.values(byNiveau).map(arr=>arr.length));
+  const svgWidth = 84 + maxPerRow*26 + 16;
+
+  return `
+  <svg class="thermo-svg" viewBox="0 0 ${svgWidth} 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="thermo-scale" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="var(--bleu)"/>
+        <stop offset="25%" stop-color="var(--vert)"/>
+        <stop offset="50%" stop-color="var(--jaune)"/>
+        <stop offset="75%" stop-color="var(--orange)"/>
+        <stop offset="100%" stop-color="var(--rouge)"/>
+      </linearGradient>
+      <clipPath id="thermo-tube-clip"><rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10"/></clipPath>
+    </defs>
+    <!-- échelle de référence, toujours visible en fond -->
+    <rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10" fill="url(#thermo-scale)" opacity="0.18"/>
+    <rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <!-- mercure : remplissage jusqu'au niveau courant -->
+    <g clip-path="url(#thermo-tube-clip)">
+      <rect x="26" y="${fillTop}" width="20" height="${tubeHeight}" fill="${currentColor}"/>
+    </g>
+    <!-- bulbe -->
+    <circle cx="36" cy="228" r="16" fill="${currentColor}"/>
+    <circle cx="36" cy="228" r="16" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    ${ticks}
+    ${markers}
+  </svg>
+  <div class="thermo-current-label ${isCrise?'crise':''}">${isCrise ? '🚨 Crise majeure' : NIVEAU_LABELS[niveau]}</div>
+  <div class="thermo-sub">Niveau ${niveau} / ${MAX_NIVEAU}</div>
+  <div class="thermo-sub" style="margin-top:6px;">● = actif · ○✓ = résolu — survolez un repère pour le détail</div>`;
 }
 
 function renderGame(s){
@@ -1173,6 +1354,12 @@ function renderGame(s){
     </div>
 
     <div>
+      <div class="panel">
+        <div class="panel-head"><h2>Niveau de crise</h2></div>
+        <div class="thermo-panel">${renderThermometer(niveauGlobal, s.events)}</div>
+        <p class="hint" style="text-align:center;">Progresse quand un événement actif est mal traité ou reste 3 tours sans suite.</p>
+      </div>
+
       <div class="panel">
         <div class="panel-head"><h2>Mise en contexte</h2><button class="btn" id="btn-toggle-context">${LOCAL.contextOpen?'Masquer':'Afficher'}</button></div>
         ${LOCAL.contextOpen ? `
