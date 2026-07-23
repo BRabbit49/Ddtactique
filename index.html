@@ -1212,22 +1212,22 @@ function renderGauge(niveauMax){
 }
 
 // Couleur pleine de chaque palier du thermomètre : 0 bleu (calme) → 4 rouge (crise majeure)
-const THERMO_COLORS = ['var(--bleu)','var(--vert)','var(--jaune)','var(--orange)','var(--rouge)'];
+const THERMO_COLORS = ['#0063cb','#18753c','#a68200','#b34000','#ce0500'];
 
 function renderThermometer(niveau, events){
   niveau = Math.max(0, Math.min(niveau, MAX_NIVEAU));
-  const tubeTop = 14, tubeBottom = 210, tubeHeight = tubeBottom - tubeTop;
+  const tubeTop = 20, tubeBottom = 205, tubeHeight = tubeBottom - tubeTop;
   const fillTop = tubeBottom - (niveau / MAX_NIVEAU) * tubeHeight;
   const currentColor = THERMO_COLORS[niveau];
   const isCrise = niveau >= MAX_NIVEAU;
-  // repères des 5 paliers (0 à 4) le long du tube
+  // repères des 5 paliers (0 à 4), avec une pastille de couleur rappelant l'échelle de vigilance
   let ticks = '';
   for(let i=0; i<=MAX_NIVEAU; i++){
     const y = tubeBottom - (i / MAX_NIVEAU) * tubeHeight;
-    ticks += `<line x1="46" y1="${y}" x2="52" y2="${y}" stroke="var(--text-faint)" stroke-width="1.5"/>
-      <text x="56" y="${y+4}" font-size="10" font-family="Public Sans, sans-serif" fill="var(--text-faint)">${i}</text>`;
+    ticks += `<circle cx="50" cy="${y}" r="4" fill="${THERMO_COLORS[i]}"/>
+      <text x="60" y="${y+4}" font-size="10" font-family="Public Sans, sans-serif" fill="var(--text-faint)">${i}</text>`;
   }
-  // repères par événement : un pastille numérotée par carte active ou résolue,
+  // repères par événement : une pastille numérotée par carte active ou résolue,
   // positionnée sur le tube selon SON PROPRE niveau — pour que les joueurs
   // situent chaque inject, même quand un nouveau vient s'ajouter aux autres.
   const plottable = (events||[]).filter(e=>e.status==='active' || e.status==='resolved');
@@ -1238,7 +1238,7 @@ function renderThermometer(niveau, events){
     const nv = parseInt(nvStr,10);
     const y = tubeBottom - (nv / MAX_NIVEAU) * tubeHeight;
     byNiveau[nv].forEach((e,idx)=>{
-      const x = 84 + idx*26;
+      const x = 88 + idx*26;
       const resolved = e.status==='resolved';
       const col = THERMO_COLORS[Math.min(nv,MAX_NIVEAU)];
       const title = 'Événement '+e.num+' — '+e.titre+' — '+(resolved?'résolu':'actif')+', niveau '+NIVEAU_LABELS[Math.min(nv,MAX_NIVEAU)];
@@ -1251,30 +1251,42 @@ function renderThermometer(niveau, events){
     });
   });
   const maxPerRow = Math.max(1, ...Object.values(byNiveau).map(arr=>arr.length));
-  const svgWidth = 84 + maxPerRow*26 + 16;
+  const svgWidth = 88 + maxPerRow*26 + 16;
+  const bulbCy = 224, bulbR = 18;
 
   return `
   <svg class="thermo-svg" viewBox="0 0 ${svgWidth} 260" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="thermo-scale" x1="0" y1="1" x2="0" y2="0">
-        <stop offset="0%" stop-color="var(--bleu)"/>
-        <stop offset="25%" stop-color="var(--vert)"/>
-        <stop offset="50%" stop-color="var(--jaune)"/>
-        <stop offset="75%" stop-color="var(--orange)"/>
-        <stop offset="100%" stop-color="var(--rouge)"/>
-      </linearGradient>
-      <clipPath id="thermo-tube-clip"><rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10"/></clipPath>
+      <clipPath id="thermo-tube-clip"><rect x="30" y="${tubeTop}" width="16" height="${tubeHeight}" rx="8"/></clipPath>
+      <radialGradient id="thermo-bulb-shine" cx="38%" cy="32%" r="70%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+        <stop offset="45%" stop-color="#ffffff" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="thermo-shadow" x="-40%" y="-20%" width="180%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#000000" flood-opacity="0.18"/>
+      </filter>
     </defs>
-    <!-- échelle de référence, toujours visible en fond -->
-    <rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10" fill="url(#thermo-scale)" opacity="0.18"/>
-    <rect x="26" y="${tubeTop}" width="20" height="${tubeHeight}" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-    <!-- mercure : remplissage jusqu'au niveau courant -->
-    <g clip-path="url(#thermo-tube-clip)">
-      <rect x="26" y="${fillTop}" width="20" height="${tubeHeight}" fill="${currentColor}"/>
+
+    <!-- support / plaque de fond -->
+    <rect x="16" y="4" width="46" height="${bulbCy - 4 + bulbR + 10}" rx="14" fill="var(--bg-panel-raised)" stroke="var(--line)" stroke-width="1"/>
+
+    <!-- verre du tube -->
+    <g filter="url(#thermo-shadow)">
+      <rect x="29" y="${tubeTop-1}" width="18" height="${tubeHeight+2}" rx="9" fill="#ffffff" stroke="var(--line)" stroke-width="1.5"/>
+      <!-- mercure : remplissage jusqu'au niveau courant -->
+      <g clip-path="url(#thermo-tube-clip)">
+        <rect x="30" y="${fillTop}" width="16" height="${tubeHeight}" fill="${currentColor}"/>
+      </g>
+      <!-- capuchon supérieur -->
+      <rect x="31" y="${tubeTop-7}" width="14" height="8" rx="4" fill="#d8dadd" stroke="var(--line)" stroke-width="1"/>
+      <!-- bulbe -->
+      <circle cx="38" cy="${bulbCy}" r="${bulbR}" fill="${currentColor}" stroke="var(--line)" stroke-width="1.5"/>
+      <!-- reflet verre (tube + bulbe) -->
+      <rect x="32" y="${tubeTop+2}" width="3" height="${tubeHeight-6}" rx="1.5" fill="#ffffff" opacity="0.45"/>
+      <circle cx="38" cy="${bulbCy}" r="${bulbR}" fill="url(#thermo-bulb-shine)"/>
     </g>
-    <!-- bulbe -->
-    <circle cx="36" cy="228" r="16" fill="${currentColor}"/>
-    <circle cx="36" cy="228" r="16" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+
     ${ticks}
     ${markers}
   </svg>
@@ -1354,6 +1366,17 @@ function renderGame(s){
     </div>
 
     <div>
+      ${!isMJ && me ? `
+      <div class="panel">
+        <div class="panel-head"><h2>Votre main</h2><span class="badge">${me.hand.length} carte(s)</span></div>
+        <div class="hand-zone">${me.hand.length ? me.hand.map(h=>renderHandCardStatic(h)).join('') : '<span class="hint">Main vide.</span>'}</div>
+        <div class="deck-btns">
+          <button class="btn" data-draw="action" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte action</button>
+          <button class="btn" data-draw="ressource" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte ressource</button>
+        </div>
+        <p class="hint">Une pioche par tour. Les cartes se jouent au moment d'envoyer une réponse à un inject actif.</p>
+      </div>` : ''}
+
       <div class="panel">
         <div class="panel-head"><h2>Niveau de crise</h2></div>
         <div class="thermo-panel">${renderThermometer(niveauGlobal, s.events)}</div>
@@ -1376,17 +1399,6 @@ function renderGame(s){
           })()}
         ` : ''}
       </div>
-
-      ${!isMJ && me ? `
-      <div class="panel">
-        <div class="panel-head"><h2>Votre main</h2><span class="badge">${me.hand.length} carte(s)</span></div>
-        <div class="hand-zone">${me.hand.length ? me.hand.map(h=>renderHandCardStatic(h)).join('') : '<span class="hint">Main vide.</span>'}</div>
-        <div class="deck-btns">
-          <button class="btn" data-draw="action" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte action</button>
-          <button class="btn" data-draw="ressource" ${me.lastDrawTour===s.tour?'disabled':''}>🂠 Piocher 1 carte ressource</button>
-        </div>
-        <p class="hint">Une pioche par tour. Les cartes se jouent au moment d'envoyer une réponse à un inject actif.</p>
-      </div>` : ''}
 
       <div class="panel">
         <div class="panel-head"><h2>Cellule de crise</h2></div>
